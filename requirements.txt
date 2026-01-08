@@ -1,0 +1,6 @@
+langchain
+langchain_openai
+mcp
+python-dotenv
+requests
+psycopg2
