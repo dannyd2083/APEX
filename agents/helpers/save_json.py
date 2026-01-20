@@ -94,7 +94,9 @@ class SaveResults:
         return "unknown_output"
 
     def save_json_results(self, type: str, init_time: datetime, content: str):
-        filename = f"{self._get_file_by_type(type)}_{TESTER_NAME}_{init_time}.json"
+        # Replace colons with dashes for Windows compatibility
+        safe_time = str(init_time).replace(":", "-")
+        filename = f"{self._get_file_by_type(type)}_{TESTER_NAME}_{safe_time}.json"
         full_file_path = self.FOLDER_PATH / filename
 
         safe_exec = make_json_safe(content)

@@ -1,9 +1,75 @@
+# Python virtual environments
 venv/
-.DS_Store
-.env
-.vscode
+.venv/
+env/
+ENV/
+
+# Python bytecode
 __pycache__/
-anything-storage/
+*.py[cod]
+*$py.class
 *.pyc
-# execution_output.json
-# attack_chain_output.json
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE/Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+nul
+
+# AnythingLLM storage
+anything-storage/
+
+# LaTeX build files
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.synctex.gz
+docs/*.bbl
+docs/*.blg
+
+# Log files
+*.log
+/tmp/
+
+# Results (optional - uncomment to ignore result files)
+# results/*.json
+
+# Test files
+test.py
+test_*.py
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# mypy
+.mypy_cache/

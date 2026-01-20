@@ -9,7 +9,8 @@ class OpenRouterLLM:
         self.llm = ChatOpenAI(
             api_key=llm_settings.OPENROUTER_API_KEY,
             base_url=llm_settings.OPENROUTER_BASE_URL,
-            model=OPENROUTER_MODEL_NAME
+            model=OPENROUTER_MODEL_NAME,
+            max_tokens=1000
         )
 
     def _create_agent(self, tools, response_format):

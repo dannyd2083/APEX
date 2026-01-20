@@ -30,7 +30,7 @@ from agents.tools.SSHKaliTool import SSHKaliTool
 # 3. GLOBAL SETTINGS
 # ==============================================================================
 # FRESH_SCAN: If True, ignores DB cache and forces a new Nmap scan.
-FRESH_SCAN = False
+FRESH_SCAN = True
 
 # ==============================================================================
 # 4. HELPER FUNCTIONS

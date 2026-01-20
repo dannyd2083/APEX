@@ -1,3 +1,4 @@
+import sys
 from langchain.agents.structured_output import ToolStrategy
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -16,7 +17,7 @@ class KaliMCP:
 
     def _params(self) -> dict:
         return StdioServerParameters(
-            command = "python",
+            command = sys.executable,
             args = [
                 f"{project_root}/mcp/mcp_server.py",
                 "--server",
