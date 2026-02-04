@@ -21,6 +21,16 @@ def load_attack_chain_json(file_path: str):
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse attack chain JSON: {e}")
 
+def strip_markdown_code_blocks(text):
+    """Strip markdown code blocks from text."""
+    import re
+    # Match ```json ... ``` or ``` ... ```
+    pattern = r'```(?:json)?\s*([\s\S]*?)\s*```'
+    match = re.search(pattern, text)
+    if match:
+        return match.group(1).strip()
+    return text
+
 def extract_json_from_llm_response(response):
     """
     Converts LLM output (which may be LangChain messages, Pydantic objects,
@@ -31,7 +41,8 @@ def extract_json_from_llm_response(response):
         for msg in response:
             if msg.__class__.__name__ == "AIMessage":
                 try:
-                    return json.loads(msg.content)
+                    cleaned = strip_markdown_code_blocks(msg.content)
+                    return json.loads(cleaned)
                 except:
                     return {"raw_output": msg.content}
         return {"error": "No AIMessage in response"}
@@ -39,7 +50,8 @@ def extract_json_from_llm_response(response):
     # Case 2: Response is a BaseMessage
     if isinstance(response, BaseMessage):
         try:
-            return json.loads(response.content)
+            cleaned = strip_markdown_code_blocks(response.content)
+            return json.loads(cleaned)
         except:
             return {"raw_output": response.content}
 
@@ -50,7 +62,8 @@ def extract_json_from_llm_response(response):
     # Case 4: Response is a JSON string
     if isinstance(response, str):
         try:
-            return json.loads(response)
+            cleaned = strip_markdown_code_blocks(response)
+            return json.loads(cleaned)
         except:
             return {"raw_output": response}
 

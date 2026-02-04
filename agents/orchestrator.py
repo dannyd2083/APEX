@@ -25,12 +25,14 @@ from agents.llms.OpenRouter import OpenRouterLLM
 from agents.logger import DatabaseLogger
 from agents.tools.KaliMCP import KaliMCP
 from agents.tools.SSHKaliTool import SSHKaliTool
+from agents.classifier import classify_failures
 
 # ==============================================================================
 # 3. GLOBAL SETTINGS
 # ==============================================================================
 # FRESH_SCAN: If True, ignores DB cache and forces a new Nmap scan.
-FRESH_SCAN = True
+# Set to False to reuse cached recon from Supabase (saves API costs!)
+FRESH_SCAN = False
 
 # ==============================================================================
 # 4. HELPER FUNCTIONS
@@ -699,41 +701,68 @@ async def main():
                         "execution_logs": chain_data
                     })
 
-            # Load Remediation Prompt
-            remediation_template = load_prompt("remediation_prompt.txt")
-            remediation_task = (
-                remediation_template
-                .replace("__FAILURE_REPORT__", json.dumps(failed_chain_context, indent=2))
-                .replace("__KALI_IP__", ip_settings.KALI_IP)
-                .replace("__TARGET_IP__", ip_settings.TARGET_IP)
+            # --- FAILURE CLASSIFIER (NEW) ---
+            print("\n[CLASSIFIER] Classifying failed chains...")
+            classifier_start_time = time.time()
+
+            correctable_chains, fundamental_chains, classification_result = classify_failures(
+                failed_chain_context,
+                ip_settings.TARGET_IP,
+                llm
             )
 
-            # Ask LLM for Fixes
-            print("\n[REVAL] Asking LLM to fix the failed chains...")
-            reval_start_time = time.time()
-            reval_response = llm._call(remediation_task)
-            print(f"[REVAL] Remediation plan received ({time.time() - reval_start_time:.2f}s)")
+            print(f"[CLASSIFIER] Classification completed ({time.time() - classifier_start_time:.2f}s)")
 
-            clean_reval = extract_json_from_llm_response(reval_response)
-            save_result.save_json_results('reval', test_init_time, clean_reval)
+            # Save classification results
+            save_result.save_json_results('classification', test_init_time, classification_result)
 
-            # --- Phase 5: Execute Remediation ---
-            if "attack_chains" in clean_reval and len(clean_reval["attack_chains"]) > 0:
-                print(f"\n[EXEC_FIX] Executing {len(clean_reval['attack_chains'])} remediated chains via SSH...\n")
-                
-                fix_exec_start_time = time.time()
-                fix_exec_response = await execute_attack_chain_via_ssh(clean_reval, db)
-                
-                fix_exec_duration = time.time() - fix_exec_start_time
-                print(f"[EXEC_FIX] Remediation execution completed in {fix_exec_duration:.2f}s")
+            # Log fundamental chains (skipped)
+            if fundamental_chains:
+                print(f"\n[CLASSIFIER] Skipping {len(fundamental_chains)} FUNDAMENTAL chains:")
+                for chain in fundamental_chains:
+                    print(f"  - {chain['chain_name']}: {chain.get('classification_reasoning', 'N/A')}")
 
-                clean_fix_exec = extract_json_from_llm_response(fix_exec_response)
-                save_result.save_json_results('exec_fix', test_init_time, clean_fix_exec)
-                
-                total_success = len(clean_fix_exec.get('persistence_chains', []))
-                print(f"\n[FINAL] Remediated Chains Success: {total_success}/{len(clean_reval['attack_chains'])}")
+            # Only proceed with correctable chains
+            if not correctable_chains:
+                print("\n[CLASSIFIER] No correctable chains found. Skipping remediation phase.")
             else:
-                print("\n[EXEC_FIX] No valid attack chains found in remediation response. Skipping execution.")
+                print(f"\n[CLASSIFIER] Proceeding with {len(correctable_chains)} CORRECTABLE chains")
+
+                # Load Remediation Prompt
+                remediation_template = load_prompt("remediation_prompt.txt")
+                remediation_task = (
+                    remediation_template
+                    .replace("__FAILURE_REPORT__", json.dumps(correctable_chains, indent=2))
+                    .replace("__KALI_IP__", ip_settings.KALI_IP)
+                    .replace("__TARGET_IP__", ip_settings.TARGET_IP)
+                )
+
+                # Ask LLM for Fixes
+                print("\n[REVAL] Asking LLM to fix the correctable chains...")
+                reval_start_time = time.time()
+                reval_response = llm._call(remediation_task)
+                print(f"[REVAL] Remediation plan received ({time.time() - reval_start_time:.2f}s)")
+
+                clean_reval = extract_json_from_llm_response(reval_response)
+                save_result.save_json_results('reval', test_init_time, clean_reval)
+
+                # --- Phase 5: Execute Remediation ---
+                if "attack_chains" in clean_reval and len(clean_reval["attack_chains"]) > 0:
+                    print(f"\n[EXEC_FIX] Executing {len(clean_reval['attack_chains'])} remediated chains via SSH...\n")
+
+                    fix_exec_start_time = time.time()
+                    fix_exec_response = await execute_attack_chain_via_ssh(clean_reval, db)
+
+                    fix_exec_duration = time.time() - fix_exec_start_time
+                    print(f"[EXEC_FIX] Remediation execution completed in {fix_exec_duration:.2f}s")
+
+                    clean_fix_exec = extract_json_from_llm_response(fix_exec_response)
+                    save_result.save_json_results('exec_fix', test_init_time, clean_fix_exec)
+
+                    total_success = len(clean_fix_exec.get('persistence_chains', []))
+                    print(f"\n[FINAL] Remediated Chains Success: {total_success}/{len(clean_reval['attack_chains'])}")
+                else:
+                    print("\n[EXEC_FIX] No valid attack chains found in remediation response. Skipping execution.")
 
         print("\n" + "="*60)
         print("ORCHESTRATION COMPLETE")
