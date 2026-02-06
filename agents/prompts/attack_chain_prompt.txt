@@ -91,6 +91,12 @@ CRITICAL REQUIREMENTS FOR ATTACK CHAINS:
    - Include both Metasploit-based and direct exploitation methods
    - Ensure exploits match exact service versions from scan
 
+8. TARGET SERVICE INFO (REQUIRED FOR EACH CHAIN):
+   Each attack chain MUST include:
+   - "target_service": The service being exploited (e.g., "vsftpd", "samba", "tomcat")
+   - "target_port": The port number being attacked (e.g., 21, 445, 8180)
+   This is used for failure analysis if the exploit doesn't work.
+
 EXAMPLE OUTPUT FORMAT:
 {
     "target": "__TARGET_IP__",
@@ -98,6 +104,8 @@ EXAMPLE OUTPUT FORMAT:
     "attack_chains": [
         {
             "name": "Chain 1: Example RCE Exploit",
+            "target_service": "example_service",
+            "target_port": 1234,
             "use_persistent_session": true,
             "session_name": "rce_session",
             "stages": [

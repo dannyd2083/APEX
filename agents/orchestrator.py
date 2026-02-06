@@ -26,6 +26,7 @@ from agents.logger import DatabaseLogger
 from agents.tools.KaliMCP import KaliMCP
 from agents.tools.SSHKaliTool import SSHKaliTool
 from agents.classifier import classify_failures
+from agents.helpers.token_tracker import token_tracker
 
 # ==============================================================================
 # 3. GLOBAL SETTINGS
@@ -43,6 +44,58 @@ def load_prompt(name: str) -> str:
     prompt_path = prompts_dir / name
     with open(prompt_path, "r", encoding="utf-8") as f:
         return f.read()
+
+
+async def investigate_failure(ssh, target_ip: str, port: int, service_name: str) -> dict:
+    """
+    Run diagnostic commands to gather evidence before classifying a failure.
+
+    Checks:
+    1. Is the port open? (nc -zv)
+    2. What version is running? (nmap -sV)
+    3. Does a Metasploit module exist? (msfconsole search)
+
+    Args:
+        ssh: SSHKaliTool instance
+        target_ip: Target IP address
+        port: Port number to check
+        service_name: Service name (e.g., 'vsftpd', 'samba')
+
+    Returns:
+        dict with: port_open, actual_version, module_exists
+    """
+    evidence = {
+        'port_open': False,
+        'actual_version': 'unknown',
+        'module_exists': False,
+    }
+
+    print(f"\n[INVESTIGATE] Checking {service_name} on port {port}...")
+
+    try:
+        # Check 1: Is port open?
+        result = await ssh.run_command(f"nc -zv {target_ip} {port} 2>&1")
+        output = result.get('stdout', '') + result.get('stderr', '')
+        evidence['port_open'] = "open" in output.lower() or "succeeded" in output.lower()
+        print(f"  Port open: {evidence['port_open']}")
+
+        # Check 2: What version is running?
+        result = await ssh.run_command(f"nmap -sV -p {port} {target_ip}")
+        evidence['actual_version'] = result.get('stdout', '')
+        print(f"  Version check done")
+
+        # Check 3: Does Metasploit module exist?
+        result = await ssh.run_command(
+            f"msfconsole -q -x 'search type:exploit name:{service_name}; exit' 2>/dev/null"
+        )
+        output = result.get('stdout', '')
+        evidence['module_exists'] = "exploit/" in output.lower()
+        print(f"  Module exists: {evidence['module_exists']}")
+
+    except Exception as e:
+        print(f"  [INVESTIGATE] Error: {e}")
+
+    return evidence
 
 # ==============================================================================
 # 5. EXECUTION LOGIC (SSH)
@@ -553,7 +606,7 @@ async def main():
         )
 
         print("\nAsking AnythingLLM for attack chain...")
-        ac_response = llm._call(ac_question)
+        ac_response = llm._call(ac_question, phase="attack_chain_generation")
         attack_chain_duration = time.time() - attack_chain_start_time
         db.log_raw('orchestrator', 'INFO', 'Attack chain analysis completed', 
                     {'duration': attack_chain_duration})
@@ -701,14 +754,55 @@ async def main():
                         "execution_logs": chain_data
                     })
 
-            # --- FAILURE CLASSIFIER (NEW) ---
+            # --- INVESTIGATION PHASE (NEW) ---
+            # Build lookup of chain name → (target_service, target_port) from original attack chains
+            chain_service_lookup = {}
+            for chain in clean_ac.get('attack_chains', []):
+                chain_name = chain.get('name')
+                target_service = chain.get('target_service', 'unknown')
+                target_port = chain.get('target_port', 0)
+                chain_service_lookup[chain_name] = (target_service, target_port)
+
+            # Investigate each failed chain
+            print("\n[INVESTIGATE] Running diagnostic commands on failed chains...")
+            investigation_evidence = {}
+
+            async with SSHKaliTool(
+                host=ip_settings.KALI_IP,
+                username="kali",
+                password="kali",
+                timeout=120
+            ) as ssh:
+                for chain_ctx in failed_chain_context:
+                    chain_name = chain_ctx['chain_name']
+                    service, port = chain_service_lookup.get(chain_name, ('unknown', 0))
+
+                    if service != 'unknown' and port != 0:
+                        evidence = await investigate_failure(
+                            ssh,
+                            ip_settings.TARGET_IP,
+                            port,
+                            service
+                        )
+                        investigation_evidence[chain_name] = evidence
+                    else:
+                        print(f"  [INVESTIGATE] Skipping {chain_name}: missing service/port info")
+                        investigation_evidence[chain_name] = {
+                            'port_open': 'unknown',
+                            'actual_version': 'unknown',
+                            'module_exists': 'unknown',
+                            'note': 'Chain missing target_service/target_port fields'
+                        }
+
+            # --- FAILURE CLASSIFIER ---
             print("\n[CLASSIFIER] Classifying failed chains...")
             classifier_start_time = time.time()
 
             correctable_chains, fundamental_chains, classification_result = classify_failures(
                 failed_chain_context,
                 ip_settings.TARGET_IP,
-                llm
+                llm,
+                evidence=investigation_evidence
             )
 
             print(f"[CLASSIFIER] Classification completed ({time.time() - classifier_start_time:.2f}s)")
@@ -740,7 +834,7 @@ async def main():
                 # Ask LLM for Fixes
                 print("\n[REVAL] Asking LLM to fix the correctable chains...")
                 reval_start_time = time.time()
-                reval_response = llm._call(remediation_task)
+                reval_response = llm._call(remediation_task, phase="remediation")
                 print(f"[REVAL] Remediation plan received ({time.time() - reval_start_time:.2f}s)")
 
                 clean_reval = extract_json_from_llm_response(reval_response)
@@ -776,6 +870,9 @@ async def main():
                   {'traceback': traceback.format_exc()})
     
     finally:
+        # Save token usage
+        token_tracker.save(test_init_time)
+
         if db.current_run_id:
             db.end_run(status='completed')
             print("Run ended successfully")

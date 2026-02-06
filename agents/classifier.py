@@ -20,7 +20,8 @@ def load_classifier_prompt() -> str:
 def classify_failures(
     failed_chain_context: List[Dict],
     target_ip: str,
-    llm
+    llm,
+    evidence: Dict = None
 ) -> Tuple[List[Dict], List[Dict], Dict]:
     """
     Classify failed attack chains as CORRECTABLE or FUNDAMENTAL.
@@ -29,6 +30,7 @@ def classify_failures(
         failed_chain_context: List of failed chain data with execution logs
         target_ip: The target IP address
         llm: The LLM instance to use for classification
+        evidence: Optional dict of investigation evidence from investigate_failure()
 
     Returns:
         Tuple of (correctable_chains, fundamental_chains, raw_classification)
@@ -36,12 +38,19 @@ def classify_failures(
     if not failed_chain_context:
         return [], [], {}
 
+    # Format evidence for prompt
+    if evidence:
+        evidence_str = json.dumps(evidence, indent=2)
+    else:
+        evidence_str = "No investigation evidence available (using error messages only)"
+
     # Load and prepare prompt
     prompt_template = load_classifier_prompt()
     prompt = (
         prompt_template
         .replace("__TARGET_IP__", target_ip)
         .replace("__FAILED_CHAINS__", json.dumps(failed_chain_context, indent=2))
+        .replace("__INVESTIGATION_EVIDENCE__", evidence_str)
     )
 
     # Call LLM for classification

@@ -4,6 +4,8 @@ from datetime import datetime
 from langchain_core.language_models.llms import LLM
 from typing import Optional, List
 
+from agents.helpers.token_tracker import token_tracker
+
 # AnythingLLM wrapper
 class AnythingLLMLLM(LLM):
     """Wrapper to connect LangChain to a local AnythingLLM instance."""
@@ -15,7 +17,7 @@ class AnythingLLMLLM(LLM):
     def _llm_type(self) -> str:
         return "anythingllm"
     
-    def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+    def _call(self, prompt: str, stop: Optional[List[str]] = None, phase: str = "unknown") -> str:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
@@ -52,8 +54,23 @@ class AnythingLLMLLM(LLM):
             response.raise_for_status()
             json_response = response.json()
 
-            return json_response.get("textResponse", json_response.get("message", ""))
-        
+            output_text = json_response.get("textResponse", json_response.get("message", ""))
+
+            # Estimate tokens (rough: 1 token ≈ 4 chars)
+            input_tokens = len(prompt) // 4
+            output_tokens = len(output_text) // 4
+
+            # Log to tracker
+            token_tracker.log_call(
+                provider="anythingllm",
+                phase=phase,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                model="anythingllm"
+            )
+
+            return output_text
+
         except requests.exceptions.RequestException as e:
             raise ValueError(f"Error from AnythingLLM API: {e}")
 

@@ -10,6 +10,16 @@ Below are the failed attack chains with their execution logs:
 
 __FAILED_CHAINS__
 
+INVESTIGATION EVIDENCE (from diagnostic commands):
+
+__INVESTIGATION_EVIDENCE__
+
+USE THIS EVIDENCE FOR CLASSIFICATION:
+- If port_open = false → FUNDAMENTAL (service not running)
+- If module_exists = false → FUNDAMENTAL (no Metasploit module available)
+- If actual_version shows different version than expected → FUNDAMENTAL (version mismatch)
+- If all evidence looks good (port open, module exists, version matches) → likely CORRECTABLE
+
 CLASSIFICATION CRITERIA:
 
 CORRECTABLE failures (send to remediation):

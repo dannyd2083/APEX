@@ -9,6 +9,8 @@ ATTACK_CHAIN_FILE_NAME = "attack_chain_output"
 EXECUTION_FILE_NAME = "execution_output"
 REMEDIATION_FILE_NAME = "remediation_output"
 EXECUTION_FIX_FILE_NAME = "execution_fix_output"
+CLASSIFICATION_FILE_NAME = "classification_output"
+TOKEN_USAGE_FILE_NAME = "token_usage"
 
 def load_attack_chain_json(file_path: str):
     if not os.path.exists(file_path):
@@ -104,6 +106,8 @@ class SaveResults:
             return REMEDIATION_FILE_NAME
         elif type == "exec_fix":
             return EXECUTION_FIX_FILE_NAME
+        elif type == "classification":
+            return CLASSIFICATION_FILE_NAME
         return "unknown_output"
 
     def save_json_results(self, type: str, init_time: datetime, content: str):
