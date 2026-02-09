@@ -44,6 +44,7 @@ def parse_cli_args():
     parser.add_argument('--target-ip', help='Target IP address')
     parser.add_argument('--target-os', help='Target OS (Linux, Windows, FreeBSD)', default=None)
     parser.add_argument('--target-name', help='Target name for result files (e.g., Lame, Blue)', default=None)
+    parser.add_argument('--fresh-scan', action='store_true', help='Force fresh nmap scan instead of using cached recon')
     return parser.parse_args()
 
 
@@ -416,12 +417,37 @@ async def main(args):
     db = DatabaseLogger()
 
     # Apply CLI overrides
+    global FRESH_SCAN
     target_os = args.target_os or TARGET_OS
     target_name = args.target_name or "metasploitable"
     if args.target_ip:
         ip_settings.TARGET_IP = args.target_ip
+    if args.fresh_scan:
+        FRESH_SCAN = True
+
+    # Auto-detect Kali's best IP for reverse shells (LHOST)
+    # KALI_IP = host-only IP for SSH (never changes)
+    # kali_lhost = tun0 IP if VPN running, otherwise same as KALI_IP
+    kali_lhost = ip_settings.KALI_IP
+    print("[CONFIG] Detecting Kali LHOST for reverse shells...")
+    try:
+        async with SSHKaliTool(
+            host=ip_settings.KALI_IP, username="kali", password="kali", timeout=10
+        ) as ssh:
+            result = await ssh.run_command(
+                "ip -4 addr show tun0 2>/dev/null | grep -oP 'inet \\K[\\d.]+'"
+            )
+            tun0_ip = result.get('stdout', '').strip()
+            if tun0_ip:
+                kali_lhost = tun0_ip
+                print(f"[CONFIG] VPN detected — LHOST: {kali_lhost}")
+            else:
+                print(f"[CONFIG] No VPN — LHOST: {kali_lhost}")
+    except Exception as e:
+        print(f"[WARN] Could not detect tun0: {e}. LHOST: {kali_lhost}")
 
     print(f"[CONFIG] Target: {target_name} ({ip_settings.TARGET_IP}) | OS: {target_os}")
+    print(f"[CONFIG] Kali SSH: {ip_settings.KALI_IP} | Kali LHOST: {kali_lhost} | Fresh scan: {FRESH_SCAN}")
     save_result.set_target_name(target_name)
 
     try:
@@ -629,7 +655,7 @@ async def main(args):
             .replace("__TARGET_OS__", target_os)
             .replace("__TARGET_VER__", target_name)
             .replace("__TARGET_IP__", ip_settings.TARGET_IP)
-            .replace("__KALI_IP__", ip_settings.KALI_IP)
+            .replace("__KALI_IP__", kali_lhost)
             .replace("__FULL_SCAN_JSON__", structured_json_string)
         )
 
@@ -862,7 +888,7 @@ async def main(args):
                 remediation_task = (
                     remediation_template
                     .replace("__FAILURE_REPORT__", json.dumps(correctable_chains, indent=2))
-                    .replace("__KALI_IP__", ip_settings.KALI_IP)
+                    .replace("__KALI_IP__", kali_lhost)
                     .replace("__TARGET_IP__", ip_settings.TARGET_IP)
                 )
 
