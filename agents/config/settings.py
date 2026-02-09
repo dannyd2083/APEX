@@ -24,14 +24,10 @@ class LLMSettings:
     OPENROUTER_API_KEY=os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_BASE_URL=os.getenv("OPENROUTER_BASE_URL")
 
-@dataclass(frozen=True)
 class IPSettings:
-    # IP configuration
-    KALI_IP = os.getenv("KALI_IP")
-    # DVL as target
-    # TARGET_IP = os.getenv("DVL_IP")
-    # Metasploitable as target
-    TARGET_IP = os.getenv("METASPLOITABLE_IP")
+    def __init__(self, target_ip=None):
+        self.KALI_IP = os.getenv("KALI_IP")
+        self.TARGET_IP = target_ip or os.getenv("TARGET_IP", os.getenv("METASPLOITABLE_IP"))
 
 
 llm_settings = LLMSettings()

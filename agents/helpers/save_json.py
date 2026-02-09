@@ -94,9 +94,13 @@ def make_json_safe(obj):
 class SaveResults:
     FOLDER_PATH = project_root / RESULTS_FOLDER
 
-    def __post_init__(self):
+    def __init__(self):
+        self.target_name = None
         self.FOLDER_PATH.mkdir(parents=True, exist_ok=True)
-    
+
+    def set_target_name(self, name):
+        self.target_name = name
+
     def _get_file_by_type(self, type):
         if type == "ac":
             return ATTACK_CHAIN_FILE_NAME
@@ -113,7 +117,8 @@ class SaveResults:
     def save_json_results(self, type: str, init_time: datetime, content: str):
         # Replace colons with dashes for Windows compatibility
         safe_time = str(init_time).replace(":", "-")
-        filename = f"{self._get_file_by_type(type)}_{TESTER_NAME}_{safe_time}.json"
+        target = f"_{self.target_name}" if self.target_name else ""
+        filename = f"{self._get_file_by_type(type)}{target}_{TESTER_NAME}_{safe_time}.json"
         full_file_path = self.FOLDER_PATH / filename
 
         safe_exec = make_json_safe(content)

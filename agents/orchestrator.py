@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import sys
@@ -38,6 +39,31 @@ FRESH_SCAN = False
 # ==============================================================================
 # 4. HELPER FUNCTIONS
 # ==============================================================================
+def parse_cli_args():
+    parser = argparse.ArgumentParser(description='PLANTE - Automated Pentesting')
+    parser.add_argument('--target-ip', help='Target IP address')
+    parser.add_argument('--target-os', help='Target OS (Linux, Windows, FreeBSD)', default=None)
+    parser.add_argument('--target-name', help='Target name for result files (e.g., Lame, Blue)', default=None)
+    return parser.parse_args()
+
+
+# Privilege indicators by OS for success validation
+PRIVILEGE_INDICATORS = {
+    "linux": ["uid=0(root)"],
+    "windows": ["nt authority\\system", "nt authority\\\\system", "administrator"],
+    "freebsd": ["uid=0(root)", "root@"],
+    "metasploitable": ["uid=0(root)"],
+}
+
+
+def check_root_access(output, target_os="linux"):
+    """Check if output indicates root/admin access for the given OS."""
+    output_lower = output.lower()
+    os_key = target_os.lower()
+    indicators = PRIVILEGE_INDICATORS.get(os_key, PRIVILEGE_INDICATORS["linux"])
+    return any(indicator.lower() in output_lower for indicator in indicators)
+
+
 def load_prompt(name: str) -> str:
     """Read a prompt template file from the agents/prompts directory."""
     prompts_dir = project_root / "agents" / "prompts"
@@ -100,7 +126,7 @@ async def investigate_failure(ssh, target_ip: str, port: int, service_name: str)
 # ==============================================================================
 # 5. EXECUTION LOGIC (SSH)
 # ==============================================================================
-async def execute_attack_chain_via_ssh(attack_chain_json, db):
+async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux"):
     """
     Executes the provided attack chains on the Kali VM via SSH.
     Handles both persistent Metasploit sessions and standalone shell commands.
@@ -209,7 +235,7 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db):
                                 cmd_success = True
                             elif "session" in output_lower and "opened" in output_lower:
                                 cmd_success = True
-                            elif "uid=0(root)" in output_lower:
+                            elif check_root_access(output, target_os):
                                 cmd_success = True
                             elif "accepted the first client connection" in output_lower:
                                 cmd_success = True
@@ -253,7 +279,7 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db):
                             elif "python" in cmd:
                                 if "success" in output_lower:
                                     cmd_success = True
-                                elif "uid=0(root)" in output_lower:
+                                elif check_root_access(output, target_os):
                                     cmd_success = True
                                 elif "root" in output_lower and len(output) > 10:
                                     cmd_success = True
@@ -319,7 +345,7 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db):
                         full_stage_output = "\n".join([r.get("raw_output", "").lower() for r in stage_results])
                         
                         session_opened = "session" in full_stage_output and "opened" in full_stage_output
-                        got_root = "uid=0(root)" in full_stage_output or "#" in full_stage_output
+                        got_root = check_root_access(full_stage_output, target_os) or "#" in full_stage_output
                         
                         if not (session_opened or got_root):
                             print(f"  [VALIDATION] Stage '{stage_name}' failed validation: No session or root access detected.")
@@ -385,11 +411,20 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db):
 # ==============================================================================
 # 6. MAIN ORCHESTRATION LOOP
 # ==============================================================================
-async def main():
+async def main(args):
     test_init_time = datetime.now()
     db = DatabaseLogger()
 
-    try: 
+    # Apply CLI overrides
+    target_os = args.target_os or TARGET_OS
+    target_name = args.target_name or "metasploitable"
+    if args.target_ip:
+        ip_settings.TARGET_IP = args.target_ip
+
+    print(f"[CONFIG] Target: {target_name} ({ip_settings.TARGET_IP}) | OS: {target_os}")
+    save_result.set_target_name(target_name)
+
+    try:
         # --- Initialization ---
         orchestrator_agent_id = db.register_agent('Orchestrator', 'coordinator', 'localhost')
         openrouter_llm = OpenRouterLLM()
@@ -407,8 +442,8 @@ async def main():
         result = None
         recon_id = None
 
-        db.start_run(ip_settings.TARGET_IP, f"{TARGET_OS} {TARGET_VERSION}", 
-                     description="Automated penetration test with recon and attack chain analysis")
+        db.start_run(ip_settings.TARGET_IP, f"{target_os} ({target_name})",
+                     description=f"Automated penetration test: {target_name}")
         
         # Check for Cached Recon Results
         if not FRESH_SCAN:
@@ -591,8 +626,8 @@ async def main():
         ac_prompt_template = load_prompt("attack_chain_prompt.txt")
         ac_question = (
             ac_prompt_template
-            .replace("__TARGET_OS__", TARGET_OS)
-            .replace("__TARGET_VER__", TARGET_VERSION)
+            .replace("__TARGET_OS__", target_os)
+            .replace("__TARGET_VER__", target_name)
             .replace("__TARGET_IP__", ip_settings.TARGET_IP)
             .replace("__KALI_IP__", ip_settings.KALI_IP)
             .replace("__FULL_SCAN_JSON__", structured_json_string)
@@ -701,8 +736,8 @@ async def main():
         exec_question = (
             exec_prompt_template
             .replace("__TARGET_IP__", ip_settings.TARGET_IP)
-            .replace("__TARGET_OS__", TARGET_OS)
-            .replace("__TARGET_VER__", TARGET_VERSION)
+            .replace("__TARGET_OS__", target_os)
+            .replace("__TARGET_VER__", target_name)
             .replace("__ATTACK_CHAIN_JSON__", ac_response)
         )
 
@@ -716,7 +751,7 @@ async def main():
         print("\n[EXECUTION] Executing attack chain via SSH...\n")
         exec_start_time = time.time()
 
-        exec_response = await execute_attack_chain_via_ssh(clean_ac, db)
+        exec_response = await execute_attack_chain_via_ssh(clean_ac, db, target_os)
 
         exec_duration = time.time() - exec_start_time
         db.log_raw('orchestrator', 'INFO', 'Execution phase completed', {'duration': exec_duration})
@@ -754,7 +789,7 @@ async def main():
                         "execution_logs": chain_data
                     })
 
-            # --- INVESTIGATION PHASE (NEW) ---
+            # --- INVESTIGATION PHASE ---
             # Build lookup of chain name → (target_service, target_port) from original attack chains
             chain_service_lookup = {}
             for chain in clean_ac.get('attack_chains', []):
@@ -845,7 +880,7 @@ async def main():
                     print(f"\n[EXEC_FIX] Executing {len(clean_reval['attack_chains'])} remediated chains via SSH...\n")
 
                     fix_exec_start_time = time.time()
-                    fix_exec_response = await execute_attack_chain_via_ssh(clean_reval, db)
+                    fix_exec_response = await execute_attack_chain_via_ssh(clean_reval, db, target_os)
 
                     fix_exec_duration = time.time() - fix_exec_start_time
                     print(f"[EXEC_FIX] Remediation execution completed in {fix_exec_duration:.2f}s")
@@ -878,4 +913,5 @@ async def main():
             print("Run ended successfully")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    args = parse_cli_args()
+    asyncio.run(main(args))
