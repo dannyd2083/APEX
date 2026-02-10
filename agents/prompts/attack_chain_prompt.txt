@@ -8,6 +8,8 @@ Use all of this data to build REALISTIC and EXECUTABLE attack chains with proper
 FULL_SCAN_OUTPUT_JSON:
 __FULL_SCAN_JSON__
 
+__PREVIOUS_ROUNDS__
+
 CRITICAL REQUIREMENTS FOR ATTACK CHAINS:
 
 1. PERSISTENT SESSION FORMAT:
@@ -80,8 +82,13 @@ CRITICAL REQUIREMENTS FOR ATTACK CHAINS:
      - DO NOT set LHOST or LPORT.
 
    RULE B: ALL OTHER EXPLOITS (ProFTPD, UnrealIRCd, Samba, Shellshock, etc.)
-   - YOU MUST SET A PAYLOAD.
-   - Payload: "cmd/unix/reverse_netcat" (Most reliable for Metasploitable)
+   - YOU MUST SET A PAYLOAD appropriate for the target OS.
+   - Choose a payload compatible with the exploit module AND the target OS.
+     The target OS is __TARGET_OS__. Use Unix payloads for Linux/FreeBSD,
+     Windows payloads for Windows. If unsure, let the module use its default.
+   - IMPORTANT: If previous round feedback indicates a payload is incompatible,
+     you MUST choose a different one. Previous round feedback ALWAYS takes
+     priority over default choices.
    - LHOST: __KALI_IP__
    - LPORT: Unique port per chain (4444, 4445, 4446)
 

@@ -35,6 +35,7 @@ from agents.helpers.token_tracker import token_tracker
 # FRESH_SCAN: If True, ignores DB cache and forces a new Nmap scan.
 # Set to False to reuse cached recon from Supabase (saves API costs!)
 FRESH_SCAN = False
+MAX_ROUNDS = 3  # Max feedback loop iterations
 
 # ==============================================================================
 # 4. HELPER FUNCTIONS
@@ -123,6 +124,125 @@ async def investigate_failure(ssh, target_ip: str, port: int, service_name: str)
         print(f"  [INVESTIGATE] Error: {e}")
 
     return evidence
+
+def has_any_success(exec_results):
+    """Check if any chain achieved at least initial access."""
+    return bool(
+        exec_results.get('initial_chains') or
+        exec_results.get('privilege_chains') or
+        exec_results.get('persistence_chains')
+    )
+
+
+def collect_round_context(exec_results, fix_results, classification_result, original_chains):
+    """Collect context from this round for feeding into next round's chain generation."""
+    context = {"chains_attempted": [], "discoveries": []}
+
+    all_results = exec_results.get('attack_chains', {})
+
+    # Build classification lookup
+    classifications = {}
+    if classification_result:
+        for c in classification_result.get('classifications', []):
+            classifications[c['chain_name']] = c.get('classification', 'UNKNOWN')
+
+    for chain_name, chain_data in all_results.items():
+        entry = {
+            "name": chain_name,
+            "result": chain_data.get('overall_status', 'unknown'),
+            "stage_reached": chain_data.get('furthest_stage'),
+            "classification": classifications.get(chain_name),
+        }
+
+        # Extract error from failed commands
+        errors = []
+        for stage_name, commands in chain_data.items():
+            if not isinstance(commands, list):
+                continue
+            for cmd in commands:
+                if isinstance(cmd, dict) and cmd.get('status') == 'error':
+                    reason = cmd.get('failure_reason') or 'unknown error'
+                    errors.append(reason)
+        entry["errors"] = errors
+
+        # Extract useful output from successful enumeration commands
+        for stage_name, commands in chain_data.items():
+            if not isinstance(commands, list):
+                continue
+            for cmd in commands:
+                if isinstance(cmd, dict) and cmd.get('status') == 'success':
+                    output = cmd.get('raw_output', '')
+                    # Capture outputs that contain scan/enum results (>100 chars)
+                    if len(output) > 100:
+                        context["discoveries"].append({
+                            "source": chain_name,
+                            "command": cmd.get('command', ''),
+                            "output": output[:2000]
+                        })
+
+        context["chains_attempted"].append(entry)
+
+    # Include remediation results if any
+    if fix_results:
+        fix_chains = fix_results.get('attack_chains', {})
+        for chain_name, chain_data in fix_chains.items():
+            for existing in context["chains_attempted"]:
+                if existing["name"] == chain_name:
+                    existing["remediation_attempted"] = True
+                    existing["remediation_result"] = chain_data.get('overall_status', 'unknown')
+
+    return context
+
+
+def format_previous_rounds(accumulated_context):
+    """Format previous round results as text for the attack chain prompt."""
+    if not accumulated_context:
+        return ""
+
+    lines = []
+    lines.append("=" * 60)
+    lines.append("PREVIOUS ATTEMPTS (DO NOT REPEAT THESE)")
+    lines.append("=" * 60)
+
+    for round_idx, ctx in enumerate(accumulated_context, 1):
+        lines.append(f"\n--- Round {round_idx} ---")
+
+        for chain in ctx["chains_attempted"]:
+            name = chain["name"]
+            result = chain["result"]
+            errors = chain.get("errors", [])
+            classification = chain.get("classification", "N/A")
+            remediated = chain.get("remediation_attempted", False)
+            remed_result = chain.get("remediation_result", "N/A")
+
+            lines.append(f"\nChain: {name}")
+            lines.append(f"  Result: {result}")
+            if errors:
+                lines.append(f"  Errors: {'; '.join(errors[:3])}")
+            lines.append(f"  Classification: {classification}")
+            if remediated:
+                lines.append(f"  Remediation attempted: {remed_result}")
+
+        if ctx.get("discoveries"):
+            lines.append(f"\nDISCOVERIES FROM ROUND {round_idx}:")
+            lines.append("Use these findings to create NEW attack chains.")
+            for disc in ctx["discoveries"]:
+                lines.append(f"\n  Command: {disc['command']}")
+                lines.append(f"  Output:\n{disc['output']}")
+
+    lines.append("\n" + "=" * 60)
+    lines.append("RULES FOR THIS ROUND:")
+    lines.append("1. Do NOT reuse any exploit MODULE from previous rounds. Remediation")
+    lines.append("   already tried fixing parameters on those modules and it still failed.")
+    lines.append("   Choose a completely different vulnerability, service, or technique.")
+    lines.append("2. USE the discoveries above (command outputs, found directories, etc.)")
+    lines.append("   as starting points for new attack vectors.")
+    lines.append("3. Consider non-Metasploit approaches: curl, wget, manual HTTP requests,")
+    lines.append("   web shells, file upload, default credentials, etc.")
+    lines.append("=" * 60)
+
+    return "\n".join(lines)
+
 
 # ==============================================================================
 # 5. EXECUTION LOGIC (SSH)
@@ -629,13 +749,7 @@ async def main(args):
                     agent_id=orchestrator_agent_id
                 )
 
-        # --- Phase 2: Attack Chain Generation ---
-        db.log_raw('orchestrator', 'INFO', 'Starting attack chain analysis', 
-                    {'target': ip_settings.TARGET_IP, 'model': 'anythingllm'})
-            
-        attack_chain_start_time = time.time()
-
-        # Prepare JSON context for LLM
+        # --- Prepare recon data for attack chain generation ---
         if structured is None and not goto_attack_chain:
             structured_json_string = json.dumps({"error": "no_structured_response", "raw_result": str(result)}, indent=2)
         elif structured is not None:
@@ -648,163 +762,204 @@ async def main(args):
                 except Exception:
                     structured_json_string = json.dumps({"raw_structured_response": str(structured)}, indent=2, ensure_ascii=False)
 
-        # Prompt Creation
+        # Load prompt templates (once, outside loop)
         ac_prompt_template = load_prompt("attack_chain_prompt.txt")
-        ac_question = (
-            ac_prompt_template
-            .replace("__TARGET_OS__", target_os)
-            .replace("__TARGET_VER__", target_name)
-            .replace("__TARGET_IP__", ip_settings.TARGET_IP)
-            .replace("__KALI_IP__", kali_lhost)
-            .replace("__FULL_SCAN_JSON__", structured_json_string)
-        )
-
-        db.log_llm_decision(
-            llm_model='anythingllm',
-            prompt=ac_question[:2000],
-            response="Initiating attack chain analysis...",
-            reasoning="attack_chain_phase_start"
-        )
-
-        print("\nAsking AnythingLLM for attack chain...")
-        ac_response = llm._call(ac_question, phase="attack_chain_generation")
-        attack_chain_duration = time.time() - attack_chain_start_time
-        db.log_raw('orchestrator', 'INFO', 'Attack chain analysis completed', 
-                    {'duration': attack_chain_duration})
-        print("\nResponse received from LLM")
-
-        # Parse and Validate Attack Chains
-        try:
-            ac_json = extract_json_from_llm_response(ac_response)
-            
-            required_fields = ["target", "summary", "attack_chains"]
-            missing_fields = [field for field in required_fields if field not in ac_json]
-            
-            if missing_fields:
-                print(f"WARNING: Attack chain response missing fields: {missing_fields}")
-                db.log_raw('orchestrator', 'WARN', 'Attack chain response incomplete', 
-                            {'missing_fields': missing_fields})
-            
-            # Display generated chains
-            if "attack_chains" in ac_json and isinstance(ac_json["attack_chains"], list):
-                print(f"\nGenerated {len(ac_json['attack_chains'])} attack chains:")
-                for idx, chain in enumerate(ac_json["attack_chains"], 1):
-                    chain_name = chain.get("name", f"Unnamed Chain {idx}")
-                    use_persistent = chain.get("use_persistent_session", False)
-                    session_name = chain.get("session_name", "N/A")
-                    num_stages = len(chain.get("stages", []))
-                    
-                    print(f"  {idx}. {chain_name}")
-                    print(f"     - Persistent Session: {use_persistent}")
-                    if use_persistent:
-                        print(f"     - Session Name: {session_name}")
-                    print(f"     - Stages: {num_stages}")
-            else:
-                print("WARNING: No valid attack_chains found in response")
-                db.log_raw('orchestrator', 'WARN', 'No attack chains in response')
-            
-            # Log to DB
-            attack_surface = "\n".join(ac_json.get('summary', ['Attack surface analysis']))
-            proposed_chains = ac_json.get('attack_chains', [])
-            
-            chain_id = db.log_attack_chain(
-                attack_surface=attack_surface,
-                proposed_stages=proposed_chains,
-                chain_json=ac_json,
-                recon_id=recon_id if recon_id else None
-            )
-            
-            db.log_raw('orchestrator', 'INFO', 'Attack chain logged successfully', 
-                        {'chain_id': chain_id, 'num_chains': len(proposed_chains)})
-            
-        except json.JSONDecodeError as e:
-            print(f"ERROR: Failed to parse attack chain JSON: {e}")
-            db.log_raw('orchestrator', 'ERROR', 'Attack chain JSON parse error', 
-                        {'error': str(e), 'response_preview': ac_response[:500]})
-            ac_json = {
-                "target": ip_settings.TARGET_IP,
-                "summary": ["Failed to parse LLM response"],
-                "attack_chains": [],
-                "followup_requests": []
-            }
-
-        except Exception as e:
-            print(f"ERROR: Unexpected error processing attack chain: {e}")
-            db.log_raw('orchestrator', 'ERROR', 'Attack chain processing error', {'error': str(e)})
-            traceback.print_exc()
-            ac_json = {
-                "target": ip_settings.TARGET_IP,
-                "summary": ["Processing error"],
-                "attack_chains": [],
-                "followup_requests": []
-            }
-
-        db.log_llm_decision(
-            llm_model='anythingllm',
-            prompt=ac_question[:2000],
-            response=ac_response[:10000],
-            reasoning="attack_chain_phase_complete"
-        )
-
-        clean_ac = extract_json_from_llm_response(ac_response)
-        save_result.save_json_results('ac', test_init_time, clean_ac)
-
-        print("\nAttack chain generation complete")
-        print(f"Chains to execute: {len(ac_json.get('attack_chains', []))}")
-        
-
-        # --- Phase 3: Execution ---
-        db.log_raw('orchestrator', 'INFO', 'Starting execution phase', {'target': ip_settings.TARGET_IP})
-            
-        exec_start_time = time.time()
-        
         exec_prompt_template = load_prompt("execution_prompt.txt")
-        exec_question = (
-            exec_prompt_template
-            .replace("__TARGET_IP__", ip_settings.TARGET_IP)
-            .replace("__TARGET_OS__", target_os)
-            .replace("__TARGET_VER__", target_name)
-            .replace("__ATTACK_CHAIN_JSON__", ac_response)
-        )
+        remediation_template = load_prompt("remediation_prompt.txt")
 
-        db.log_llm_decision(
-            llm_model=OPENROUTER_MODEL_NAME,
-            prompt=exec_question[:2000],
-            response="Initiating execution phase...",
-            reasoning="execution_phase_start"
-        )
+        # ==============================================================
+        # FEEDBACK LOOP — Phases 2-4 repeat up to MAX_ROUNDS times
+        # ==============================================================
+        accumulated_context = []
+        final_success = False
+        # Per-stage accumulators — each round appends, saved once at end
+        ac_rounds = []
+        exec_rounds = []
+        classification_rounds = []
+        reval_rounds = []
+        exec_fix_rounds = []
 
-        print("\n[EXECUTION] Executing attack chain via SSH...\n")
-        exec_start_time = time.time()
+        for round_num in range(1, MAX_ROUNDS + 1):
+            print(f"\n{'#'*60}")
+            print(f"  ROUND {round_num}/{MAX_ROUNDS}")
+            print(f"{'#'*60}")
 
-        exec_response = await execute_attack_chain_via_ssh(clean_ac, db, target_os)
+            # Reset per-round variables
+            clean_fix_exec = None
+            classification_result = None
+            correctable_chains = []
 
-        exec_duration = time.time() - exec_start_time
-        db.log_raw('orchestrator', 'INFO', 'Execution phase completed', {'duration': exec_duration})
+            # --- Phase 2: Attack Chain Generation ---
+            db.log_raw('orchestrator', 'INFO', f'Starting attack chain analysis (round {round_num})',
+                        {'target': ip_settings.TARGET_IP, 'model': 'anythingllm', 'round': round_num})
 
-        clean_exec = extract_json_from_llm_response(exec_response)
-        save_result.save_json_results('exec', test_init_time, clean_exec)
+            attack_chain_start_time = time.time()
 
-        # --- Phase 4: Evaluation & Remediation ---
-        
-        # Identify Failures
-        clean_exec = extract_json_from_llm_response(exec_response)
-        
-        failed_chain_names = (
-            clean_exec.get('failed_chains', []) + 
-            clean_exec.get('initial_chains', []) + 
-            clean_exec.get('privilege_chains', [])
-        )
+            # Build previous rounds context (empty on round 1)
+            previous_rounds_text = format_previous_rounds(accumulated_context)
 
-        if not failed_chain_names:
-            print("\n[REVAL] No failed chains detected. Orchestration complete.")
-        else:
+            ac_question = (
+                ac_prompt_template
+                .replace("__TARGET_OS__", target_os)
+                .replace("__TARGET_VER__", target_name)
+                .replace("__TARGET_IP__", ip_settings.TARGET_IP)
+                .replace("__KALI_IP__", kali_lhost)
+                .replace("__FULL_SCAN_JSON__", structured_json_string)
+                .replace("__PREVIOUS_ROUNDS__", previous_rounds_text)
+            )
+
+            db.log_llm_decision(
+                llm_model='anythingllm',
+                prompt=ac_question[:2000],
+                response=f"Initiating attack chain analysis (round {round_num})...",
+                reasoning=f"attack_chain_phase_start_round_{round_num}"
+            )
+
+            print("\nAsking AnythingLLM for attack chain...")
+            ac_response = llm._call(ac_question, phase="attack_chain_generation")
+            attack_chain_duration = time.time() - attack_chain_start_time
+            db.log_raw('orchestrator', 'INFO', f'Attack chain analysis completed (round {round_num})',
+                        {'duration': attack_chain_duration, 'round': round_num})
+            print("\nResponse received from LLM")
+
+            # Parse and Validate Attack Chains
+            try:
+                ac_json = extract_json_from_llm_response(ac_response)
+
+                required_fields = ["target", "summary", "attack_chains"]
+                missing_fields = [field for field in required_fields if field not in ac_json]
+
+                if missing_fields:
+                    print(f"WARNING: Attack chain response missing fields: {missing_fields}")
+                    db.log_raw('orchestrator', 'WARN', 'Attack chain response incomplete',
+                                {'missing_fields': missing_fields})
+
+                # Display generated chains
+                if "attack_chains" in ac_json and isinstance(ac_json["attack_chains"], list):
+                    print(f"\nGenerated {len(ac_json['attack_chains'])} attack chains:")
+                    for idx, chain in enumerate(ac_json["attack_chains"], 1):
+                        chain_name = chain.get("name", f"Unnamed Chain {idx}")
+                        use_persistent = chain.get("use_persistent_session", False)
+                        session_name = chain.get("session_name", "N/A")
+                        num_stages = len(chain.get("stages", []))
+
+                        print(f"  {idx}. {chain_name}")
+                        print(f"     - Persistent Session: {use_persistent}")
+                        if use_persistent:
+                            print(f"     - Session Name: {session_name}")
+                        print(f"     - Stages: {num_stages}")
+                else:
+                    print("WARNING: No valid attack_chains found in response")
+                    db.log_raw('orchestrator', 'WARN', 'No attack chains in response')
+
+                # Log to DB
+                attack_surface = "\n".join(ac_json.get('summary', ['Attack surface analysis']))
+                proposed_chains = ac_json.get('attack_chains', [])
+
+                chain_id = db.log_attack_chain(
+                    attack_surface=attack_surface,
+                    proposed_stages=proposed_chains,
+                    chain_json=ac_json,
+                    recon_id=recon_id if recon_id else None
+                )
+
+                db.log_raw('orchestrator', 'INFO', 'Attack chain logged successfully',
+                            {'chain_id': chain_id, 'num_chains': len(proposed_chains)})
+
+            except json.JSONDecodeError as e:
+                print(f"ERROR: Failed to parse attack chain JSON: {e}")
+                db.log_raw('orchestrator', 'ERROR', 'Attack chain JSON parse error',
+                            {'error': str(e), 'response_preview': ac_response[:500]})
+                ac_json = {
+                    "target": ip_settings.TARGET_IP,
+                    "summary": ["Failed to parse LLM response"],
+                    "attack_chains": [],
+                    "followup_requests": []
+                }
+
+            except Exception as e:
+                print(f"ERROR: Unexpected error processing attack chain: {e}")
+                db.log_raw('orchestrator', 'ERROR', 'Attack chain processing error', {'error': str(e)})
+                traceback.print_exc()
+                ac_json = {
+                    "target": ip_settings.TARGET_IP,
+                    "summary": ["Processing error"],
+                    "attack_chains": [],
+                    "followup_requests": []
+                }
+
+            db.log_llm_decision(
+                llm_model='anythingllm',
+                prompt=ac_question[:2000],
+                response=ac_response[:10000],
+                reasoning=f"attack_chain_phase_complete_round_{round_num}"
+            )
+
+            clean_ac = extract_json_from_llm_response(ac_response)
+            ac_rounds.append({"round": round_num, **clean_ac})
+
+            print("\nAttack chain generation complete")
+            print(f"Chains to execute: {len(ac_json.get('attack_chains', []))}")
+
+            # --- Phase 3: Execution ---
+            db.log_raw('orchestrator', 'INFO', f'Starting execution phase (round {round_num})',
+                        {'target': ip_settings.TARGET_IP, 'round': round_num})
+
+            exec_start_time = time.time()
+
+            exec_question = (
+                exec_prompt_template
+                .replace("__TARGET_IP__", ip_settings.TARGET_IP)
+                .replace("__TARGET_OS__", target_os)
+                .replace("__TARGET_VER__", target_name)
+                .replace("__ATTACK_CHAIN_JSON__", ac_response)
+            )
+
+            db.log_llm_decision(
+                llm_model=OPENROUTER_MODEL_NAME,
+                prompt=exec_question[:2000],
+                response=f"Initiating execution phase (round {round_num})...",
+                reasoning=f"execution_phase_start_round_{round_num}"
+            )
+
+            print(f"\n[EXECUTION] Executing attack chains via SSH (round {round_num})...\n")
+
+            exec_response = await execute_attack_chain_via_ssh(clean_ac, db, target_os)
+
+            exec_duration = time.time() - exec_start_time
+            db.log_raw('orchestrator', 'INFO', f'Execution phase completed (round {round_num})',
+                        {'duration': exec_duration, 'round': round_num})
+
+            clean_exec = extract_json_from_llm_response(exec_response)
+            exec_rounds.append({"round": round_num, **clean_exec})
+
+            # Check for success after execution
+            if has_any_success(clean_exec):
+                print(f"\n[ROUND {round_num}] SUCCESS — chain(s) reached access!")
+                final_success = True
+                # Still run remediation for partial chains if needed, but mark success
+                break
+
+            # --- Phase 4: Evaluation & Remediation ---
+
+            # Identify Failures
+            failed_chain_names = (
+                clean_exec.get('failed_chains', []) +
+                clean_exec.get('initial_chains', []) +
+                clean_exec.get('privilege_chains', [])
+            )
+
+            if not failed_chain_names:
+                print(f"\n[ROUND {round_num}] No failed chains detected. Orchestration complete.")
+                final_success = True
+                break
+
             print(f"\n[REVAL] Found {len(failed_chain_names)} failed/partial chains. Starting remediation...")
-            
+
             # Prepare context for remediation
             failed_chain_context = []
             all_chain_results = clean_exec.get('attack_chains', {})
-            
+
             for name in failed_chain_names:
                 if name in all_chain_results:
                     chain_data = all_chain_results[name]
@@ -816,15 +971,13 @@ async def main(args):
                     })
 
             # --- INVESTIGATION PHASE ---
-            # Build lookup of chain name → (target_service, target_port) from original attack chains
             chain_service_lookup = {}
             for chain in clean_ac.get('attack_chains', []):
-                chain_name = chain.get('name')
+                cname = chain.get('name')
                 target_service = chain.get('target_service', 'unknown')
                 target_port = chain.get('target_port', 0)
-                chain_service_lookup[chain_name] = (target_service, target_port)
+                chain_service_lookup[cname] = (target_service, target_port)
 
-            # Investigate each failed chain
             print("\n[INVESTIGATE] Running diagnostic commands on failed chains...")
             investigation_evidence = {}
 
@@ -835,8 +988,8 @@ async def main(args):
                 timeout=120
             ) as ssh:
                 for chain_ctx in failed_chain_context:
-                    chain_name = chain_ctx['chain_name']
-                    service, port = chain_service_lookup.get(chain_name, ('unknown', 0))
+                    cname = chain_ctx['chain_name']
+                    service, port = chain_service_lookup.get(cname, ('unknown', 0))
 
                     if service != 'unknown' and port != 0:
                         evidence = await investigate_failure(
@@ -845,10 +998,10 @@ async def main(args):
                             port,
                             service
                         )
-                        investigation_evidence[chain_name] = evidence
+                        investigation_evidence[cname] = evidence
                     else:
-                        print(f"  [INVESTIGATE] Skipping {chain_name}: missing service/port info")
-                        investigation_evidence[chain_name] = {
+                        print(f"  [INVESTIGATE] Skipping {cname}: missing service/port info")
+                        investigation_evidence[cname] = {
                             'port_open': 'unknown',
                             'actual_version': 'unknown',
                             'module_exists': 'unknown',
@@ -868,23 +1021,17 @@ async def main(args):
 
             print(f"[CLASSIFIER] Classification completed ({time.time() - classifier_start_time:.2f}s)")
 
-            # Save classification results
-            save_result.save_json_results('classification', test_init_time, classification_result)
+            classification_rounds.append({"round": round_num, **classification_result})
 
-            # Log fundamental chains (skipped)
             if fundamental_chains:
                 print(f"\n[CLASSIFIER] Skipping {len(fundamental_chains)} FUNDAMENTAL chains:")
                 for chain in fundamental_chains:
                     print(f"  - {chain['chain_name']}: {chain.get('classification_reasoning', 'N/A')}")
 
-            # Only proceed with correctable chains
-            if not correctable_chains:
-                print("\n[CLASSIFIER] No correctable chains found. Skipping remediation phase.")
-            else:
+            # Remediate correctable chains
+            if correctable_chains:
                 print(f"\n[CLASSIFIER] Proceeding with {len(correctable_chains)} CORRECTABLE chains")
 
-                # Load Remediation Prompt
-                remediation_template = load_prompt("remediation_prompt.txt")
                 remediation_task = (
                     remediation_template
                     .replace("__FAILURE_REPORT__", json.dumps(correctable_chains, indent=2))
@@ -892,16 +1039,15 @@ async def main(args):
                     .replace("__TARGET_IP__", ip_settings.TARGET_IP)
                 )
 
-                # Ask LLM for Fixes
                 print("\n[REVAL] Asking LLM to fix the correctable chains...")
                 reval_start_time = time.time()
                 reval_response = llm._call(remediation_task, phase="remediation")
                 print(f"[REVAL] Remediation plan received ({time.time() - reval_start_time:.2f}s)")
 
                 clean_reval = extract_json_from_llm_response(reval_response)
-                save_result.save_json_results('reval', test_init_time, clean_reval)
+                reval_rounds.append({"round": round_num, **clean_reval})
 
-                # --- Phase 5: Execute Remediation ---
+                # Execute Remediation
                 if "attack_chains" in clean_reval and len(clean_reval["attack_chains"]) > 0:
                     print(f"\n[EXEC_FIX] Executing {len(clean_reval['attack_chains'])} remediated chains via SSH...\n")
 
@@ -912,16 +1058,57 @@ async def main(args):
                     print(f"[EXEC_FIX] Remediation execution completed in {fix_exec_duration:.2f}s")
 
                     clean_fix_exec = extract_json_from_llm_response(fix_exec_response)
-                    save_result.save_json_results('exec_fix', test_init_time, clean_fix_exec)
+                    exec_fix_rounds.append({"round": round_num, **clean_fix_exec})
 
                     total_success = len(clean_fix_exec.get('persistence_chains', []))
-                    print(f"\n[FINAL] Remediated Chains Success: {total_success}/{len(clean_reval['attack_chains'])}")
-                else:
-                    print("\n[EXEC_FIX] No valid attack chains found in remediation response. Skipping execution.")
+                    print(f"\n[EXEC_FIX] Remediated Chains Success: {total_success}/{len(clean_reval['attack_chains'])}")
 
-        print("\n" + "="*60)
-        print("ORCHESTRATION COMPLETE")
-        print("="*60)
+                    # Check for success after remediation
+                    if has_any_success(clean_fix_exec):
+                        print(f"\n[ROUND {round_num}] SUCCESS after remediation!")
+                        final_success = True
+                        break
+                else:
+                    print("\n[EXEC_FIX] No valid attack chains in remediation response. Skipping execution.")
+            else:
+                print("\n[CLASSIFIER] No correctable chains found. Skipping remediation phase.")
+
+            # --- Collect context for next round ---
+            round_ctx = collect_round_context(
+                clean_exec,
+                clean_fix_exec,
+                classification_result,
+                clean_ac
+            )
+            accumulated_context.append(round_ctx)
+
+            if round_num < MAX_ROUNDS:
+                print(f"\n[ROUND {round_num}] All chains failed. Pivoting to round {round_num + 1}...")
+            else:
+                print(f"\n[ROUND {round_num}] Max rounds reached. Stopping.")
+
+        # --- End of feedback loop — save all rounds to per-stage files ---
+        def _wrap_rounds(rounds_list):
+            return {
+                "target": ip_settings.TARGET_IP,
+                "total_rounds": round_num,
+                "final_result": "SUCCESS" if final_success else "FAILED",
+                "rounds": rounds_list,
+            }
+
+        save_result.save_json_results('ac', test_init_time, _wrap_rounds(ac_rounds))
+        save_result.save_json_results('exec', test_init_time, _wrap_rounds(exec_rounds))
+        if classification_rounds:
+            save_result.save_json_results('classification', test_init_time, _wrap_rounds(classification_rounds))
+        if reval_rounds:
+            save_result.save_json_results('reval', test_init_time, _wrap_rounds(reval_rounds))
+        if exec_fix_rounds:
+            save_result.save_json_results('exec_fix', test_init_time, _wrap_rounds(exec_fix_rounds))
+
+        print(f"\n{'='*60}")
+        print(f"ORCHESTRATION COMPLETE — {'SUCCESS' if final_success else 'FAILED'}")
+        print(f"Rounds used: {round_num}/{MAX_ROUNDS}")
+        print(f"{'='*60}")
         
     except Exception as e:
         print(f"\n ERROR: {e}")
