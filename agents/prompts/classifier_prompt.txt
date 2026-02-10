@@ -74,12 +74,7 @@ IMPORTANT:
 - Every failed chain must have exactly one classification
 - Be conservative: if unsure, classify as CORRECTABLE (give it a chance to be fixed)
 - Focus on error SEMANTICS, not just keywords
-- **CRITICAL**: For "module not found" errors, USE YOUR KNOWLEDGE of Metasploit to check if a REAL module exists for the target service. Common corrections:
-  - Samba/SMB exploits: exploit/multi/samba/usermap_script (for Samba 3.0.20-3.0.25)
-  - vsftpd 2.3.4: exploit/unix/ftp/vsftpd_234_backdoor
-  - UnrealIRCd: exploit/unix/irc/unreal_ircd_3281_backdoor
-  - Tomcat: exploit/multi/http/tomcat_mgr_upload
-  - PostgreSQL: exploit/linux/postgres/postgres_payload
+- **CRITICAL**: For "module not found" errors, USE YOUR KNOWLEDGE of Metasploit to determine if a real module exists for the target service and version. If a valid alternative module exists, classify as CORRECTABLE and suggest the correct module name. If no known module exists for this vulnerability, classify as FUNDAMENTAL.
 - **CRITICAL**: If Metasploit commands (use, set, exploit) return "command not found", classify as CORRECTABLE - the commands ran in bash instead of msfconsole.
 
 Analyze the failures and provide your classifications now.

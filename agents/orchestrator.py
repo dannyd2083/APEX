@@ -383,9 +383,9 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
                             elif cmd.strip().lower().startswith(("set ", "use ")):
                                 if "=>" in output or "no payload configured" in output_lower:
                                     cmd_success = True
-                                elif "msf6 exploit" in output_lower or "msf6 auxiliary" in output_lower:
+                                elif "msf exploit" in output_lower or "msf auxiliary" in output_lower:
                                     cmd_success = True
-                                elif "msf6" in output_lower and "error" not in output_lower:
+                                elif "msf" in output_lower and "exploit(" in output_lower and "error" not in output_lower:
                                     cmd_success = True
                         
                         # Regular Command Checks
@@ -462,14 +462,18 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
                         stage_success = any(r["status"] == "success" for r in stage_results)
                     
                     # Strict Validation for Exploitation Stages
-                    if stage_name in ["initial_access", "privilege_escalation"]:
-                        full_stage_output = "\n".join([r.get("raw_output", "").lower() for r in stage_results])
-                        
+                    full_stage_output = "\n".join([r.get("raw_output", "").lower() for r in stage_results])
+
+                    if stage_name == "initial_access":
                         session_opened = "session" in full_stage_output and "opened" in full_stage_output
-                        got_root = check_root_access(full_stage_output, target_os) or "#" in full_stage_output
-                        
-                        if not (session_opened or got_root):
-                            print(f"  [VALIDATION] Stage '{stage_name}' failed validation: No session or root access detected.")
+                        if not session_opened:
+                            print(f"  [VALIDATION] Stage 'initial_access' failed: No session opened.")
+                            stage_success = False
+
+                    elif stage_name == "privilege_escalation":
+                        got_root = check_root_access(full_stage_output, target_os)
+                        if not got_root:
+                            print(f"  [VALIDATION] Stage 'privilege_escalation' failed: No root/admin access detected.")
                             stage_success = False
 
                     # Final Stage Decision
@@ -1037,6 +1041,7 @@ async def main(args):
                     .replace("__FAILURE_REPORT__", json.dumps(correctable_chains, indent=2))
                     .replace("__KALI_IP__", kali_lhost)
                     .replace("__TARGET_IP__", ip_settings.TARGET_IP)
+                    .replace("__TARGET_OS__", target_os)
                 )
 
                 print("\n[REVAL] Asking LLM to fix the correctable chains...")
