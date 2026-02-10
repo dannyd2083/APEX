@@ -56,9 +56,15 @@ class AnythingLLMLLM(LLM):
 
             output_text = json_response.get("textResponse", json_response.get("message", ""))
 
-            # Estimate tokens (rough: 1 token ≈ 4 chars)
-            input_tokens = len(prompt) // 4
-            output_tokens = len(output_text) // 4
+            # Extract actual token counts from AnythingLLM metrics if available
+            metrics = json_response.get("metrics", {})
+            if metrics and metrics.get("prompt_tokens"):
+                input_tokens = metrics["prompt_tokens"]
+                output_tokens = metrics.get("completion_tokens", len(output_text) // 4)
+            else:
+                # Fallback: estimate tokens (rough: 1 token ≈ 4 chars)
+                input_tokens = len(prompt) // 4
+                output_tokens = len(output_text) // 4
 
             # Log to tracker
             token_tracker.log_call(

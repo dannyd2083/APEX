@@ -55,7 +55,7 @@ def classify_failures(
 
     # Call LLM for classification
     print("\n[CLASSIFIER] Analyzing failed chains...")
-    response = llm._call(prompt)
+    response = llm._call(prompt, phase="classification")
 
     # Parse response
     classification_result = extract_classification_json(response)
