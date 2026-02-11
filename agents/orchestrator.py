@@ -493,6 +493,34 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
 
                     if stage_name == "initial_access":
                         session_opened = "session" in full_stage_output and "opened" in full_stage_output
+                        if not session_opened and use_persistent and session_name:
+                            # Exploit may still be running in background — retry sessions check.
+                            # Backgrounded exploits (-j) print "no session was created" immediately
+                            # but the actual exploitation continues asynchronously.
+                            has_terminal_failure = any(marker in full_stage_output for marker in [
+                                "exploit failed", "died", "invalid session"
+                            ])
+                            if not has_terminal_failure:
+                                print(f"  [VALIDATION] No session yet — exploit may still be running. Retrying in 20s...")
+                                await asyncio.sleep(20)
+                                retry_result = await ssh.run_in_persistent_session(session_name, "sessions -l", wait_time=5)
+                                retry_output = (retry_result["stdout"] + retry_result["stderr"]).lower()
+                                full_stage_output = full_stage_output + "\n" + retry_output
+                                session_opened = "session" in full_stage_output and "opened" in full_stage_output
+                                if not session_opened and "no active sessions" not in retry_output and "meterpreter" in retry_output:
+                                    session_opened = True
+                                if session_opened:
+                                    print(f"  [VALIDATION] Session found on retry!")
+                                    stage_results.append({
+                                        "description": "Auto-retry: session check after additional wait",
+                                        "command": "sessions -l",
+                                        "command_type": "session_command",
+                                        "raw_output": retry_result["stdout"] + retry_result["stderr"],
+                                        "analysis": "Type: session_command. SUCCESS (retry)",
+                                        "status": "success",
+                                        "return_code": 0,
+                                        "failure_reason": None
+                                    })
                         if not session_opened:
                             print(f"  [VALIDATION] Stage 'initial_access' failed: No session opened.")
                             stage_success = False
@@ -512,19 +540,28 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
                         break # Stop chain execution immediately on failure
 
                 # --- Chain Classification ---
+                # Only exploitation stages count toward success.
+                # Non-exploitation stages (reconnaissance, enumeration, scanning) are
+                # informational — they don't mean we achieved access to the target.
+                EXPLOITATION_STAGES = {"initial_access", "privilege_escalation", "persistence"}
+
                 if chain_success_stage is None:
                     results["failed_chains"].append(chain_name)
                     overall = "failed"
                     print(f"\n[CHAIN] Result: FAILED - No stages succeeded")
-                elif "initial" in chain_success_stage.lower():
+                elif chain_success_stage not in EXPLOITATION_STAGES:
+                    # Chain completed but only reached non-exploitation stages (e.g., recon)
+                    overall = "completed"
+                    print(f"\n[CHAIN] Result: COMPLETED ({chain_success_stage}) - Non-exploitation, not counted as access")
+                elif chain_success_stage == "initial_access":
                     results["initial_chains"].append(chain_name)
                     overall = "partial"
                     print(f"\n[CHAIN] Result: PARTIAL - Got initial access")
-                elif "privilege" in chain_success_stage.lower():
+                elif chain_success_stage == "privilege_escalation":
                     results["privilege_chains"].append(chain_name)
                     overall = "partial"
                     print(f"\n[CHAIN] Result: PARTIAL - Escalated privileges")
-                else:
+                elif chain_success_stage == "persistence":
                     results["persistence_chains"].append(chain_name)
                     overall = "completed"
                     print(f"\n[CHAIN] Result: COMPLETED - Full chain successful")
