@@ -74,7 +74,19 @@ def load_prompt(name: str) -> str:
         return f.read()
 
 
-async def investigate_failure(ssh, target_ip: str, port: int, service_name: str) -> dict:
+def extract_module_from_chain(chain):
+    """Extract the MSF module path from a chain's commands (e.g., 'exploit/windows/smb/ms17_010_eternalblue')."""
+    for stage in chain.get('stages', []):
+        for cmd_obj in stage.get('commands', []):
+            cmd_str = cmd_obj.get('command', '') if isinstance(cmd_obj, dict) else str(cmd_obj)
+            if cmd_str.strip().lower().startswith('use '):
+                module_path = cmd_str.strip()[4:].strip()
+                if '/' in module_path:  # Looks like a real module path
+                    return module_path
+    return None
+
+
+async def investigate_failure(ssh, target_ip: str, port: int, service_name: str, module_path: str = None) -> dict:
     """
     Run diagnostic commands to gather evidence before classifying a failure.
 
@@ -88,6 +100,7 @@ async def investigate_failure(ssh, target_ip: str, port: int, service_name: str)
         target_ip: Target IP address
         port: Port number to check
         service_name: Service name (e.g., 'vsftpd', 'samba')
+        module_path: MSF module path from chain commands (e.g., 'exploit/windows/smb/ms17_010_eternalblue')
 
     Returns:
         dict with: port_open, actual_version, module_exists
@@ -113,11 +126,20 @@ async def investigate_failure(ssh, target_ip: str, port: int, service_name: str)
         print(f"  Version check done")
 
         # Check 3: Does Metasploit module exist?
+        # Use the actual module name from the chain if available, otherwise fall back to service name.
+        # Nmap service names (e.g., "microsoft-ds") don't match MSF module names (e.g., "ms17_010_eternalblue").
+        if module_path:
+            search_term = module_path.split('/')[-1]  # e.g., "ms17_010_eternalblue"
+            print(f"  Searching MSF for module: {search_term} (from chain)")
+        else:
+            search_term = service_name
+            print(f"  Searching MSF for service: {search_term} (fallback)")
+
         result = await ssh.run_command(
-            f"msfconsole -q -x 'search type:exploit name:{service_name}; exit' 2>/dev/null"
+            f"msfconsole -q -x 'search name:{search_term}; exit' 2>/dev/null"
         )
         output = result.get('stdout', '')
-        evidence['module_exists'] = "exploit/" in output.lower()
+        evidence['module_exists'] = "exploit/" in output.lower() or "auxiliary/" in output.lower()
         print(f"  Module exists: {evidence['module_exists']}")
 
     except Exception as e:
@@ -253,7 +275,7 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
     Handles both persistent Metasploit sessions and standalone shell commands.
     """
     results = {
-        "target": attack_chain_json["target"],
+        "target": attack_chain_json.get("target", "unknown"),
         "attack_chains": {},
         "failed_chains": [],
         "initial_chains": [],
@@ -261,19 +283,24 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
         "persistence_chains": []
     }
 
+    chains = attack_chain_json.get("attack_chains", [])
+    if not chains:
+        print(f"\n[EXEC] No attack chains to execute. Skipping.")
+        return results
+
     print(f"\n[EXEC] Connecting to Kali VM at {ip_settings.KALI_IP}...")
-    
+
     async with SSHKaliTool(
         host=ip_settings.KALI_IP,
         username="kali",
-        password="kali",  
+        password="kali",
         timeout=120
     ) as ssh:
-        
-        total_chains = len(attack_chain_json['attack_chains'])
+
+        total_chains = len(chains)
         print(f"[EXEC] Processing {total_chains} attack chains...\n")
 
-        for chain_idx, chain in enumerate(attack_chain_json["attack_chains"], 1):
+        for chain_idx, chain in enumerate(chains, 1):
             try:
                 # --- Chain Setup ---
                 chain_name = chain["name"]
@@ -320,7 +347,7 @@ async def execute_attack_chain_via_ssh(attack_chain_json, db, target_os="linux")
                             cmd = cmd_obj.get("command", "")
                             wait_time = cmd_obj.get("wait", 3)
                         
-                        print(f"\n  [CMD {idx}/{len(commands)}] Type: {cmd_type}")
+                        print(f"\n  [CMD {idx}/{len(commands)}] Type: {cmd_type} | Wait: {wait_time}s")
                         if cmd:
                             print(f"  Command: {cmd[:80]}{'...' if len(cmd) > 80 else ''}")
                         
@@ -574,6 +601,15 @@ async def main(args):
     print(f"[CONFIG] Kali SSH: {ip_settings.KALI_IP} | Kali LHOST: {kali_lhost} | Fresh scan: {FRESH_SCAN}")
     save_result.set_target_name(target_name)
 
+    # Initialize accumulators OUTSIDE try block so they're always available in finally
+    ac_rounds = []
+    exec_rounds = []
+    classification_rounds = []
+    reval_rounds = []
+    exec_fix_rounds = []
+    final_success = False
+    round_num = 0
+
     try:
         # --- Initialization ---
         orchestrator_agent_id = db.register_agent('Orchestrator', 'coordinator', 'localhost')
@@ -775,13 +811,6 @@ async def main(args):
         # FEEDBACK LOOP — Phases 2-4 repeat up to MAX_ROUNDS times
         # ==============================================================
         accumulated_context = []
-        final_success = False
-        # Per-stage accumulators — each round appends, saved once at end
-        ac_rounds = []
-        exec_rounds = []
-        classification_rounds = []
-        reval_rounds = []
-        exec_fix_rounds = []
 
         for round_num in range(1, MAX_ROUNDS + 1):
             print(f"\n{'#'*60}")
@@ -946,6 +975,14 @@ async def main(args):
 
             # --- Phase 4: Evaluation & Remediation ---
 
+            # Check if any chains were actually executed
+            if not clean_exec.get('attack_chains'):
+                print(f"\n[ROUND {round_num}] No chains were executed (LLM returned empty/invalid response). Continuing...")
+                if round_num < MAX_ROUNDS:
+                    continue
+                else:
+                    break
+
             # Identify Failures
             failed_chain_names = (
                 clean_exec.get('failed_chains', []) +
@@ -980,7 +1017,8 @@ async def main(args):
                 cname = chain.get('name')
                 target_service = chain.get('target_service', 'unknown')
                 target_port = chain.get('target_port', 0)
-                chain_service_lookup[cname] = (target_service, target_port)
+                module_path = extract_module_from_chain(chain)
+                chain_service_lookup[cname] = (target_service, target_port, module_path)
 
             print("\n[INVESTIGATE] Running diagnostic commands on failed chains...")
             investigation_evidence = {}
@@ -993,14 +1031,15 @@ async def main(args):
             ) as ssh:
                 for chain_ctx in failed_chain_context:
                     cname = chain_ctx['chain_name']
-                    service, port = chain_service_lookup.get(cname, ('unknown', 0))
+                    service, port, module_path = chain_service_lookup.get(cname, ('unknown', 0, None))
 
                     if service != 'unknown' and port != 0:
                         evidence = await investigate_failure(
                             ssh,
                             ip_settings.TARGET_IP,
                             port,
-                            service
+                            service,
+                            module_path=module_path
                         )
                         investigation_evidence[cname] = evidence
                     else:
@@ -1092,37 +1131,42 @@ async def main(args):
             else:
                 print(f"\n[ROUND {round_num}] Max rounds reached. Stopping.")
 
-        # --- End of feedback loop — save all rounds to per-stage files ---
-        def _wrap_rounds(rounds_list):
-            return {
-                "target": ip_settings.TARGET_IP,
-                "total_rounds": round_num,
-                "final_result": "SUCCESS" if final_success else "FAILED",
-                "rounds": rounds_list,
-            }
-
-        save_result.save_json_results('ac', test_init_time, _wrap_rounds(ac_rounds))
-        save_result.save_json_results('exec', test_init_time, _wrap_rounds(exec_rounds))
-        if classification_rounds:
-            save_result.save_json_results('classification', test_init_time, _wrap_rounds(classification_rounds))
-        if reval_rounds:
-            save_result.save_json_results('reval', test_init_time, _wrap_rounds(reval_rounds))
-        if exec_fix_rounds:
-            save_result.save_json_results('exec_fix', test_init_time, _wrap_rounds(exec_fix_rounds))
-
         print(f"\n{'='*60}")
         print(f"ORCHESTRATION COMPLETE — {'SUCCESS' if final_success else 'FAILED'}")
         print(f"Rounds used: {round_num}/{MAX_ROUNDS}")
         print(f"{'='*60}")
-        
+
     except Exception as e:
         print(f"\n ERROR: {e}")
         import traceback
         traceback.print_exc()
-        db.log_raw('orchestrator', 'ERROR', f'Fatal error: {str(e)}', 
+        db.log_raw('orchestrator', 'ERROR', f'Fatal error: {str(e)}',
                   {'traceback': traceback.format_exc()})
-    
+
     finally:
+        # Save all collected round data — runs even after crashes so partial data is preserved
+        try:
+            def _wrap_rounds(rounds_list):
+                return {
+                    "target": ip_settings.TARGET_IP,
+                    "total_rounds": round_num,
+                    "final_result": "SUCCESS" if final_success else "FAILED",
+                    "rounds": rounds_list,
+                }
+
+            if ac_rounds:
+                save_result.save_json_results('ac', test_init_time, _wrap_rounds(ac_rounds))
+            if exec_rounds:
+                save_result.save_json_results('exec', test_init_time, _wrap_rounds(exec_rounds))
+            if classification_rounds:
+                save_result.save_json_results('classification', test_init_time, _wrap_rounds(classification_rounds))
+            if reval_rounds:
+                save_result.save_json_results('reval', test_init_time, _wrap_rounds(reval_rounds))
+            if exec_fix_rounds:
+                save_result.save_json_results('exec_fix', test_init_time, _wrap_rounds(exec_fix_rounds))
+        except Exception as save_err:
+            print(f"\n[WARN] Failed to save result files: {save_err}")
+
         # Save token usage
         token_tracker.save(test_init_time)
 

