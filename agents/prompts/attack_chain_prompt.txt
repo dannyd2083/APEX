@@ -45,6 +45,10 @@ CRITICAL REQUIREMENTS FOR ATTACK CHAINS:
    - Use exploit module
    - Set required options (RHOSTS, RPORT, etc.)
    - CRITICAL: Set PAYLOAD and LHOST (See Rule 6)
+   - TARGET SELECTION: For buffer overflow exploits (ms08_067, ms06_040, etc.),
+     use TARGET 0 (Automatic) unless you have specific knowledge of the exact
+     OS version and service pack. Wrong offsets will CRASH the target service
+     with no possibility of retry.
    - Run "exploit -j" (background job)
    - Wait 15 seconds
    - List sessions with "sessions -l"

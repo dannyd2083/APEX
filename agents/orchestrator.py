@@ -86,12 +86,12 @@ def extract_module_from_chain(chain):
     return None
 
 
-async def investigate_failure(ssh, target_ip: str, port: int, service_name: str, module_path: str = None) -> dict:
+async def investigate_failure(ssh, target_ip: str, port: int, service_name: str, module_path: str = None, chain_output: str = None) -> dict:
     """
     Run diagnostic commands to gather evidence before classifying a failure.
 
     Checks:
-    1. Is the port open? (nc -zv)
+    1. Is the port open? (nc -zv, cross-referenced with exploit output)
     2. What version is running? (nmap -sV)
     3. Does a Metasploit module exist? (msfconsole search)
 
@@ -101,6 +101,7 @@ async def investigate_failure(ssh, target_ip: str, port: int, service_name: str,
         port: Port number to check
         service_name: Service name (e.g., 'vsftpd', 'samba')
         module_path: MSF module path from chain commands (e.g., 'exploit/windows/smb/ms17_010_eternalblue')
+        chain_output: Raw output from the chain's execution (used to check if exploit connected)
 
     Returns:
         dict with: port_open, actual_version, module_exists
@@ -115,10 +116,35 @@ async def investigate_failure(ssh, target_ip: str, port: int, service_name: str,
 
     try:
         # Check 1: Is port open?
-        result = await ssh.run_command(f"nc -zv {target_ip} {port} 2>&1")
-        output = result.get('stdout', '') + result.get('stderr', '')
-        evidence['port_open'] = "open" in output.lower() or "succeeded" in output.lower()
-        print(f"  Port open: {evidence['port_open']}")
+        # First check the exploit's own output — if the exploit connected to the target,
+        # the port was open when it mattered. A post-exploit nc check can give false negatives
+        # if the exploit crashed the target service (e.g., MS08-067 buffer overflow crashes svchost).
+        exploit_connected = False
+        if chain_output:
+            output_lower = chain_output.lower()
+            connection_markers = [
+                "attempting to trigger",
+                "binding to",
+                "connection established",
+                "connecting to target",
+                "connected to target",
+                "calling dcom",
+                "calling rpc",
+                "sending exploit",
+                "sending stage",
+                "started reverse tcp handler",
+                "trying target",
+            ]
+            exploit_connected = any(marker in output_lower for marker in connection_markers)
+
+        if exploit_connected:
+            evidence['port_open'] = True
+            print(f"  Port open: True (exploit output confirms connection)")
+        else:
+            result = await ssh.run_command(f"nc -zv {target_ip} {port} 2>&1")
+            output = result.get('stdout', '') + result.get('stderr', '')
+            evidence['port_open'] = "open" in output.lower() or "succeeded" in output.lower()
+            print(f"  Port open: {evidence['port_open']} (nc check)")
 
         # Check 2: What version is running?
         result = await ssh.run_command(f"nmap -sV -p {port} {target_ip}")
@@ -1070,13 +1096,24 @@ async def main(args):
                     cname = chain_ctx['chain_name']
                     service, port, module_path = chain_service_lookup.get(cname, ('unknown', 0, None))
 
+                    # Collect raw output from the chain's execution for connection evidence
+                    chain_raw_output = ""
+                    exec_logs = chain_ctx.get('execution_logs', {})
+                    for stage_name, commands in exec_logs.items():
+                        if not isinstance(commands, list):
+                            continue
+                        for cmd in commands:
+                            if isinstance(cmd, dict):
+                                chain_raw_output += cmd.get('raw_output', '') + "\n"
+
                     if service != 'unknown' and port != 0:
                         evidence = await investigate_failure(
                             ssh,
                             ip_settings.TARGET_IP,
                             port,
                             service,
-                            module_path=module_path
+                            module_path=module_path,
+                            chain_output=chain_raw_output
                         )
                         investigation_evidence[cname] = evidence
                     else:
