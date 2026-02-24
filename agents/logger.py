@@ -307,3 +307,190 @@ class DatabaseLogger:
                         {'run_id': self.current_run_id, 'final_status': status})
         except Exception as e:
             print(f"Failed to end run: {e}")
+
+    # ----------------------------------------------------------------
+    # Multi-agent system methods (new tables: tasks, findings, hypotheses)
+    # ----------------------------------------------------------------
+
+    def start_session(self, target_url, target_name, goal, scope,
+                      target_ip=None, target_os=None,
+                      max_cost_usd=5.0, max_turns=50):
+        """Start a new pentest session for the multi-agent system. Returns run_id."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """INSERT INTO attack_runs
+                   (target_ip, target_os, status, description,
+                    target_url, goal, scope, max_cost_usd, max_turns)
+                   VALUES (%s, %s, 'running', %s, %s, %s, %s, %s, %s)
+                   RETURNING run_id""",
+                (target_ip, target_os, target_name,
+                 target_url, goal, scope, max_cost_usd, max_turns)
+            )
+            self.current_run_id = cursor.fetchone()[0]
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            print(f"Started session: run_id={self.current_run_id} target={target_url}")
+            return self.current_run_id
+        except Exception as e:
+            print(f"Failed to start session: {e}")
+            return None
+
+    def log_task(self, task, parent_db_id=None):
+        """Insert a Task into the tasks table. Returns the DB task_id (int)."""
+        if not self.current_run_id:
+            return None
+
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """INSERT INTO tasks
+                   (run_id, parent_id, description, status,
+                    evidence_required, attempt_count, max_attempts, assigned_to)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   RETURNING task_id""",
+                (self.current_run_id, parent_db_id, task.description, task.status,
+                 task.evidence_required, task.attempt_count,
+                 task.max_attempts, task.assigned_to)
+            )
+            task_id = cursor.fetchone()[0]
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return task_id
+        except Exception as e:
+            print(f"Failed to log task: {e}")
+            return None
+
+    def update_task(self, task_id, status, attempt_count, evidence_found=None, updated_at=None):
+        """Update task status and evidence in the DB."""
+        if not task_id:
+            return
+
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """UPDATE tasks
+                   SET status = %s,
+                       attempt_count = %s,
+                       evidence_found = %s,
+                       updated_at = NOW()
+                   WHERE task_id = %s""",
+                (status, attempt_count,
+                 Json(evidence_found) if evidence_found else None,
+                 task_id)
+            )
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Failed to update task {task_id}: {e}")
+
+    def log_finding(self, finding):
+        """Insert a Finding into the findings table. Returns finding_id (int)."""
+        if not self.current_run_id:
+            return None
+
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """INSERT INTO findings
+                   (run_id, task_id, type, value, confidence, evidence, is_verified)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   RETURNING finding_id""",
+                (self.current_run_id, finding.task_id, finding.type,
+                 finding.value, finding.confidence, finding.evidence,
+                 finding.is_verified)
+            )
+            finding_id = cursor.fetchone()[0]
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return finding_id
+        except Exception as e:
+            print(f"Failed to log finding: {e}")
+            return None
+
+    def log_hypothesis(self, hypothesis):
+        """Insert a Hypothesis into the hypotheses table. Returns hypothesis_id (int)."""
+        if not self.current_run_id:
+            return None
+
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """INSERT INTO hypotheses
+                   (run_id, description, confidence, status)
+                   VALUES (%s, %s, %s, %s)
+                   RETURNING hypothesis_id""",
+                (self.current_run_id, hypothesis.description,
+                 hypothesis.confidence, hypothesis.status)
+            )
+            hypothesis_id = cursor.fetchone()[0]
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return hypothesis_id
+        except Exception as e:
+            print(f"Failed to log hypothesis: {e}")
+            return None
+
+    def update_run_budget(self, run_id, total_cost_usd, total_turns):
+        """Update running cost and turn count on the session row."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """UPDATE attack_runs
+                   SET total_cost_usd = %s, total_turns = %s
+                   WHERE run_id = %s""",
+                (total_cost_usd, total_turns, run_id)
+            )
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Failed to update budget: {e}")
+
+    def update_run_final_evidence(self, run_id, evidence):
+        """Store the goal-achievement proof on the session row."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """UPDATE attack_runs
+                   SET final_evidence = %s, status = 'completed'
+                   WHERE run_id = %s""",
+                (Json({"evidence": evidence}), run_id)
+            )
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            print(f"Goal achieved — evidence saved for run {run_id}")
+        except Exception as e:
+            print(f"Failed to save final evidence: {e}")

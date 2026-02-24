@@ -791,19 +791,31 @@ async def main(args):
                     structured_dict = structured.model_dump() if hasattr(structured, 'model_dump') else (
                             structured.dict() if hasattr(structured, 'dict') else structured
                         )
-                        
+
+                    # Unwrap KaliMCPResponse: {"output": "..."} → parse the inner JSON
+                    recon_data = structured_dict
+                    if isinstance(structured_dict, dict) and 'output' in structured_dict and len(structured_dict) == 1:
+                        inner = structured_dict['output']
+                        if isinstance(inner, dict):
+                            recon_data = inner
+                        elif isinstance(inner, str):
+                            try:
+                                recon_data = json.loads(inner)
+                            except Exception:
+                                recon_data = structured_dict
+
                     recon_id = db.log_recon(
                         tool_used='kali_mcp_agent',
                         raw_output=raw_output,
-                        result_json=structured_dict,
+                        result_json=recon_data,
                         target_ip=ip_settings.TARGET_IP,
                         agent_id=orchestrator_agent_id
                     )
 
                     # Log vulnerabilities
                     vuln_count = 0
-                    if isinstance(structured_dict, dict) and 'open_ports' in structured_dict:
-                        for port_info in structured_dict.get('open_ports', []):
+                    if isinstance(recon_data, dict) and 'open_ports' in recon_data:
+                        for port_info in recon_data.get('open_ports', []):
                             if 'cve_candidates' in port_info and port_info['cve_candidates']:
                                 for cve in port_info['cve_candidates']:
                                     severity = 'high' if port_info.get('risk') == 'high' else 'medium'
@@ -856,14 +868,28 @@ async def main(args):
         if structured is None and not goto_attack_chain:
             structured_json_string = json.dumps({"error": "no_structured_response", "raw_result": str(result)}, indent=2)
         elif structured is not None:
-            if isinstance(structured, dict):
-                structured_json_string = json.dumps(structured, indent=2, ensure_ascii=False)
-            else:
+            # Unwrap KaliMCPResponse Pydantic model — extract the .output field
+            raw_data = structured
+            if hasattr(structured, 'output'):
+                raw_data = structured.output
+            elif hasattr(structured, 'model_dump'):
+                dumped = structured.model_dump()
+                raw_data = dumped.get('output', dumped)
+
+            if isinstance(raw_data, dict):
+                structured_json_string = json.dumps(raw_data, indent=2, ensure_ascii=False)
+            elif isinstance(raw_data, str):
                 try:
-                    parsed = json.loads(structured)
+                    parsed = json.loads(raw_data)
                     structured_json_string = json.dumps(parsed, indent=2, ensure_ascii=False)
                 except Exception:
-                    structured_json_string = json.dumps({"raw_structured_response": str(structured)}, indent=2, ensure_ascii=False)
+                    structured_json_string = json.dumps({"raw_structured_response": raw_data}, indent=2, ensure_ascii=False)
+            else:
+                try:
+                    parsed = json.loads(str(raw_data))
+                    structured_json_string = json.dumps(parsed, indent=2, ensure_ascii=False)
+                except Exception:
+                    structured_json_string = json.dumps({"raw_structured_response": str(raw_data)}, indent=2, ensure_ascii=False)
 
         # Load prompt templates (once, outside loop)
         ac_prompt_template = load_prompt("attack_chain_prompt.txt")
@@ -1054,9 +1080,19 @@ async def main(args):
             )
 
             if not failed_chain_names:
-                print(f"\n[ROUND {round_num}] No failed chains detected. Orchestration complete.")
-                final_success = True
-                break
+                if has_any_success(clean_exec):
+                    print(f"\n[ROUND {round_num}] No failed chains detected. Orchestration complete.")
+                    final_success = True
+                    break
+                else:
+                    # All chains were recon-only (no exploitation attempted) — not a real success
+                    print(f"\n[ROUND {round_num}] No exploitation chains executed (recon-only round). Collecting context and continuing...")
+                    round_ctx = collect_round_context(clean_exec, None, None, clean_ac)
+                    accumulated_context.append(round_ctx)
+                    if round_num < MAX_ROUNDS:
+                        continue
+                    else:
+                        break
 
             print(f"\n[REVAL] Found {len(failed_chain_names)} failed/partial chains. Starting remediation...")
 

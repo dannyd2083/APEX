@@ -1,8 +1,12 @@
-# AI Battle Bots with MCP
+# PLANTE — AI-Driven Automated Penetration Testing
 
 An AI-powered automated penetration testing framework that uses LLM agents to conduct autonomous reconnaissance and exploitation against intentionally vulnerable systems.
 
-## Architecture Overview
+We inherited this project from the 2025 cohort and have been extending it — see the Capstone section at the bottom for what changed and where it's going.
+
+## Original Architecture (v1)
+
+The original system is a single orchestrator that plans everything upfront and executes blindly:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -26,22 +30,50 @@ An AI-powered automated penetration testing framework that uses LLM agents to co
 └─────────────────┘
 ```
 
+Pipeline: `Recon → LLM plans all commands upfront → Execute → Classify failure → Remediate → Done`
+
+## New Architecture (v2, in progress)
+
+We're replacing the orchestrator with three agents that work in a closed loop — the coordinator sees command output before deciding what to do next, rather than planning everything at once:
+
+```
+┌──────────────────────────────────────────┐
+│              Windows Host                │
+│                                          │
+│  ┌─────────────┐    ┌────────────────┐   │
+│  │ Coordinator │───▶│  Recon Agent   │   │
+│  │  (Brain)    │    │ nmap/gobuster  │   │
+│  │             │◀───│ /ZAP/curl      │   │
+│  │             │    └────────────────┘   │
+│  │             │                         │
+│  │             │    ┌────────────────┐   │
+│  │             │───▶│ Execute Agent  │   │
+│  │             │    │ curl/sqlmap    │   │
+│  │             │◀───│ /web tools     │   │
+│  └──────┬──────┘    └────────────────┘   │
+│         ▼                                │
+│  ┌─────────────┐   All agents use:       │
+│  │  Supabase   │   Kali Linux VM via     │
+│  │  (Logging)  │   MCP + SSH             │
+│  └─────────────┘                         │
+└──────────────────────────────────────────┘
+```
+
+Focus is now on **black-box web pentesting** — the coordinator reads HTTP responses, adapts its approach, and tracks findings in a task tree (PTT). This is what was missing in v1.
+
 ## Document Source
 - [LangChain](https://docs.langchain.com/oss/python/langchain/overview)
-- [AnythingLLM](https://docs.anythingllm.com/introduction)
-
-## DVL Source
-- [DVL](https://www.vulnhub.com/series/damn-vulnerable-linux-dvl,1/)
-- [DVL Setup](https://github.com/alyssarusk/ai-battle-bots/blob/main/DVL.md)
+- [MCP-Kali-Server](https://github.com/Wh0am123/MCP-Kali-Server)
 
 ## Setup
 
 ### 1. mcp-kali-server
-MCP bridging Kali VM and Agents [Github](https://github.com/Wh0am123/MCP-Kali-Server).
+
+MCP bridging Kali VM and Agents — [Github](https://github.com/Wh0am123/MCP-Kali-Server).
 
 #### 1.1 Setting up on Kali VM
 
-1. Download and import Kali VM from [offical website](https://www.kali.org/get-kali/#kali-virtual-machines)
+1. Download and import Kali VM from [official website](https://www.kali.org/get-kali/#kali-virtual-machines)
     - Extract zip to desired location
     - In VirtualBox, click **Add** to import VM
     - Change network setting to **Host-Only Adapter** (for Adapter 1)
@@ -54,6 +86,10 @@ MCP bridging Kali VM and Agents [Github](https://github.com/Wh0am123/MCP-Kali-Se
 3. Start Server (**IMPORTANT: use --ip 0.0.0.0 to allow external connections**)
     ```
     python MCP-Kali-Server/kali_server.py --ip 0.0.0.0
+    ```
+4. For web recon, start OWASP ZAP in daemon mode:
+    ```
+    zaproxy -daemon -port 8080 -host 0.0.0.0
     ```
 
 #### 1.2 Setting up on Host Machine
@@ -73,25 +109,14 @@ MCP bridging Kali VM and Agents [Github](https://github.com/Wh0am123/MCP-Kali-Se
     pip install requests fastmcp
     ```
 
-2. Fix logging errors in `mcp_server.py` file by changing:
+2. Fix logging errors in `mcp_server.py` — change `sys.stdout` to `sys.stderr`:
 
     ```python
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.StreamHandler(sys.stdout) # This line needs changing
-        ]
-    )
-    ```
-
-    To:
-    ```python
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stderr) # Change to this
+            logging.StreamHandler(sys.stderr)
         ]
     )
     ```
@@ -101,15 +126,7 @@ MCP bridging Kali VM and Agents [Github](https://github.com/Wh0am123/MCP-Kali-Se
     python kali_server.py
     ```
 
-### 2. redstack-vault
-#### 2.1 Start Server
-Navigate to redstack-vault/.mcp-server
-Run
-```
-./start.sh
-```
-
-### 3. Project Installation
+### 2. Project Installation
 ```
 pip install -r requirements.txt
 ```
@@ -119,22 +136,13 @@ pip install -r requirements.txt
 pip install langchain-mcp-adapters asyncssh paramiko scp
 ```
 
-**Packages**
-- langchain
-- langchain_openai - OpenAI-compatible models
-- mcp - connection to MCP servers
-- python-dotenv - manage env variables
-- requests - needed to connect to APIs (AnythingLLM)
-- psycopg2 - connecting to db
-
-### 4. Environment Configuration
+### 3. Environment Configuration
 
 Copy `.env.example` to `.env` and fill in your values:
 
 ```bash
 # VM IP Addresses (find yours with `ip addr` in each VM)
 KALI_IP=<your-kali-ip>
-METASPLOITABLE_IP=<your-metasploitable-ip>
 
 # OpenRouter LLM
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
@@ -142,11 +150,6 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 
 # Tester Name (for result files)
 TESTER_NAME=YourName
-
-# AnythingLLM (optional)
-ANYTHINGLLM_API_KEY=your-key
-ANYTHINGLLM_API_URL=http://localhost:3001/api/v1
-ANYTHINGLLM_WORKSPACE_SLUG=plante
 
 # Supabase Database
 DB_HOST=your-project.supabase.co
@@ -157,7 +160,7 @@ DB_NAME=postgres
 DB_SSLMODE=require
 ```
 
-### 5. VirtualBox Network Setup
+### 4. VirtualBox Network Setup
 
 Each setup may have different IP addresses depending on your VirtualBox configuration.
 
@@ -169,44 +172,51 @@ Each setup may have different IP addresses depending on your VirtualBox configur
    - **Adapter 2** (Kali only): NAT (for internet access)
 5. Start VMs and find their IPs:
    ```bash
-   # In each VM terminal
    ip addr
    ```
 6. Update your `.env` file with the discovered IPs
 
-**Note**: Your IPs will likely differ from others. Common ranges are `192.168.56.x` or `192.168.x.x` depending on your Host-Only network configuration.
+**Note**: Common ranges are `192.168.56.x` or `192.168.x.x` depending on your Host-Only network configuration.
+
+### 5. Database Migration (v2)
+
+Run `docs/migration_v2.sql` in the Supabase SQL editor. Adds the tables needed for the multi-agent system (tasks, findings, hypotheses, gate_decisions). Safe to run — no destructive changes to existing tables.
 
 ## Repo Folders
-### agents
-Python files for agents created using Langchain.
 
-Currently containing agent:
-- Orchestrator
+### agents/
+- `orchestrator.py` — original single-pipeline engine (v1, still works)
+- `coordinator.py` — multi-agent brain (v2, in progress)
+- `recon_agent.py` — recon worker (ZAP, gobuster, nmap)
+- `state.py` — shared state dataclasses for v2
+- `logger.py` — DB logging for both v1 and v2
+- `tools/` — SSH and MCP tool wrappers
+- `llms/` — OpenRouter client
+- `prompts/` — LLM prompt templates
 
-*get_workspaces.py can be used to find AnythingLLM workplace slugs*
-
-### config_files
-json files needed to connect the Kali MCP to the LLM.
-
-Currently containing config file for:
-- AnythingLLM
-
-### docs/weekly_updates
-Weekly progress reports.
+### docs/
+- `migration_v2.sql` — database migration for v2 tables
+- `run_log.md` — notes from all test runs
+- `presentation_outline.md` — slides outline
 
 ### results/
-Output JSON files from test runs.
+Output JSON files from test runs (gitignored, local only).
 
-## Running the Orchestrator
+## Running
+
+### v1 (original pipeline, still works)
 
 ```bash
 # Activate venv
-.venv\Scripts\activate    # Windows
-source .venv/bin/activate # Mac/Linux
+.\venv\Scripts\activate    # Windows
+source .venv/bin/activate  # Mac/Linux
 
-# Run orchestrator
-python agents/orchestrator.py
+python -m agents.orchestrator --target-ip <IP> --target-os <OS> --target-name <Name> --fresh-scan
 ```
+
+### v2 (multi-agent, in progress)
+
+Not ready yet — coordinator.py is being built.
 
 ## Troubleshooting
 
@@ -217,6 +227,11 @@ python agents/orchestrator.py
 **Solution**: Start server with `--ip 0.0.0.0`:
 ```bash
 python3 kali_server.py --ip 0.0.0.0
+```
+
+### Port 5000 Already in Use on Kali
+```bash
+sudo kill -9 $(sudo lsof -t -i :5000)
 ```
 
 ### SSH Permission Denied
@@ -244,19 +259,28 @@ python3 kali_server.py --ip 0.0.0.0
 
 **Symptom**: `OSError: [Errno 22] Invalid argument` when saving results
 
-**Solution**: Fixed in `agents/helpers/save_json.py` - colons replaced with dashes in timestamps
+**Solution**: Fixed in `agents/helpers/save_json.py` — colons replaced with dashes in timestamps
 
 ## Cost Estimates
 
-- **OpenRouter (Grok-4)**: ~$0.30-0.50 per full pentest run
-- **Supabase**: Free tier sufficient for testing
-- **AnythingLLM**: Free (uses your own API keys)
+- **OpenRouter (Grok-4)**: ~$0.20–0.50 per run (1 round), ~$1.00–1.40 (3 rounds)
+- **Supabase**: Free tier is enough for testing
+- **OWASP ZAP**: Free, runs on Kali
 
-## Capstone Project (2026)
+## Capstone 2026
 
-Potential research direction: Improving the system's ability to handle failed exploits by exploring alternative attack paths when initial attempts fail. Details TBD.
+We tested the v1 system on 7 HackTheBox machines:
 
-## Contributors
+| Box | OS | Result |
+|-----|----|--------|
+| Lame | Linux | Samba exploit worked |
+| Blue | Windows | EternalBlue worked |
+| Legacy | Windows | MS08-067 worked |
+| Optimum | Windows | Got user shell, not SYSTEM |
+| Bashed | Linux | Failed — found web shell but sent wrong POST param |
+| Jerry | Windows | Failed — tried `tomcat:tomcat`, real password was in the 401 page |
+| Nibbles | Linux | Failed — found the path but too late |
 
-- Danny (Capstone 2026)
-- Previous cohort: Alyssa, Nina (2025)
+Network exploits went 4/4. Web app boxes went 0/3. The problem in all three failures was the same: the LLM couldn't see HTTP responses during execution, so it couldn't adapt when something was slightly off.
+
+That's what v2 is trying to fix — building a coordinator that reads output and decides what to do next, rather than planning everything before running a single command.

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 from agents.config.settings import project_root, TESTER_NAME
 from langchain_core.messages import BaseMessage
@@ -25,13 +26,22 @@ def load_attack_chain_json(file_path: str):
 
 def strip_markdown_code_blocks(text):
     """Strip markdown code blocks from text."""
-    import re
-    # Match ```json ... ``` or ``` ... ```
-    pattern = r'```(?:json)?\s*([\s\S]*?)\s*```'
+    # Match ```json ... ``` or ``` ... ``` (case-insensitive language tag)
+    pattern = r'```(?:json|JSON)?\s*([\s\S]*?)\s*```'
     match = re.search(pattern, text)
     if match:
         return match.group(1).strip()
     return text
+
+def fix_invalid_json_escapes(text):
+    """Fix bash/shell escape sequences that are invalid in JSON.
+
+    LLMs often generate shell commands with escapes like \\$ and \\' which are
+    valid in bash but not in JSON. JSON only allows: \\" \\\\ \\/ \\b \\f \\n \\r \\t \\uXXXX.
+    This converts invalid escapes (e.g. \\$ -> \\\\$) so json.loads() can parse them.
+    """
+    # Replace \X where X is not a valid JSON escape character with \\X
+    return re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)
 
 def extract_json_from_llm_response(response):
     """
@@ -45,8 +55,12 @@ def extract_json_from_llm_response(response):
                 try:
                     cleaned = strip_markdown_code_blocks(msg.content)
                     return json.loads(cleaned)
-                except:
-                    return {"raw_output": msg.content}
+                except json.JSONDecodeError:
+                    try:
+                        fixed = fix_invalid_json_escapes(cleaned)
+                        return json.loads(fixed)
+                    except:
+                        return {"raw_output": msg.content}
         return {"error": "No AIMessage in response"}
 
     # Case 2: Response is a BaseMessage
@@ -54,8 +68,12 @@ def extract_json_from_llm_response(response):
         try:
             cleaned = strip_markdown_code_blocks(response.content)
             return json.loads(cleaned)
-        except:
-            return {"raw_output": response.content}
+        except json.JSONDecodeError:
+            try:
+                fixed = fix_invalid_json_escapes(cleaned)
+                return json.loads(fixed)
+            except:
+                return {"raw_output": response.content}
 
     # Case 3: Response is already a dict
     if isinstance(response, dict):
@@ -66,8 +84,12 @@ def extract_json_from_llm_response(response):
         try:
             cleaned = strip_markdown_code_blocks(response)
             return json.loads(cleaned)
-        except:
-            return {"raw_output": response}
+        except json.JSONDecodeError:
+            try:
+                fixed = fix_invalid_json_escapes(cleaned)
+                return json.loads(fixed)
+            except:
+                return {"raw_output": response}
 
     return {"raw_output": str(response)}
 
