@@ -70,6 +70,11 @@ class ReconAgent:
         return self._parse(raw_text)
 
     def _extract_last_message(self, result: dict) -> str:
+        # With structured output (KaliMCPResponse), the parsed result lives here
+        sr = result.get("structured_response")
+        if sr and hasattr(sr, "output"):
+            return sr.output
+
         messages = result.get("messages", [])
         if not messages:
             return ""

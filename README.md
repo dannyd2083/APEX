@@ -59,7 +59,7 @@ We're replacing the orchestrator with three agents that work in a closed loop �
 └──────────────────────────────────────────┘
 ```
 
-Focus is now on **black-box web pentesting** — the coordinator reads HTTP responses, adapts its approach, and tracks findings in a task tree (PTT). This is what was missing in v1.
+Focus is now on **black-box web pentesting** — the coordinator reads HTTP responses, adapts its approach, and tracks findings in a task tree (PTT). Before each LLM call the coordinator queries the redstack-vault knowledge base (4000+ real-world attack chains) and injects relevant patterns into the prompt. This is what was missing in v1.
 
 ## Document Source
 - [LangChain](https://docs.langchain.com/oss/python/langchain/overview)
@@ -133,8 +133,12 @@ pip install -r requirements.txt
 
 **Additional packages needed:**
 ```
-pip install langchain-mcp-adapters asyncssh paramiko scp
+pip install langchain-mcp-adapters asyncssh paramiko scp pyyaml
 ```
+
+**Attack chain knowledge base (v2 only):**
+
+Place the `redstack-vault` repo as a sibling directory alongside PLANTE (same parent folder). `VaultRAG` in `agents/helpers/vault_rag.py` expects it at `../redstack-vault/`.
 
 ### 3. Environment Configuration
 
@@ -187,11 +191,13 @@ Run `docs/migration_v2.sql` in the Supabase SQL editor. Adds the tables needed f
 ### agents/
 - `orchestrator.py` — original single-pipeline engine (v1, still works)
 - `coordinator.py` — multi-agent brain (v2, in progress)
-- `recon_agent.py` — recon worker (ZAP, gobuster, nmap)
+- `recon_agent.py` — recon worker (ZAP, gobuster, nmap, curl)
+- `execute_agent.py` — execute worker (curl, sqlmap, hydra, wfuzz)
 - `state.py` — shared state dataclasses for v2
 - `logger.py` — DB logging for both v1 and v2
 - `tools/` — SSH and MCP tool wrappers
 - `llms/` — OpenRouter client
+- `helpers/vault_rag.py` — RAG over redstack-vault attack chain library
 - `prompts/` — LLM prompt templates
 
 ### docs/

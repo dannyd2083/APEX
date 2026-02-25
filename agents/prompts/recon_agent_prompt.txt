@@ -11,10 +11,10 @@ Tool guidance:
 - gobuster/ffuf: directory and file brute-forcing
 - curl: manual HTTP requests, check headers, follow redirects
 - nikto: quick web server misconfiguration scan
-- zap-cli: OWASP ZAP for spidering and active vulnerability scanning
-  - Spider first:   zap-cli spider <url>
-  - Active scan:    zap-cli active-scan <url>
-  - List findings:  zap-cli alerts --output-format json
+- zap-cli: OWASP ZAP for spidering and active vulnerability scanning (always pass -p 8080)
+  - Spider first:   zap-cli -p 8080 spider <url>
+  - Active scan:    zap-cli -p 8080 active-scan <url>
+  - List findings:  zap-cli -p 8080 alerts --output-format json
 
 Instructions:
 1. Use the available tools to achieve the objective.
