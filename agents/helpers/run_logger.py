@@ -151,7 +151,16 @@ class RunLogger:
             f.write(f"**Reasoning:**\n{d['reasoning']}\n\n")
             f.write(f"**Action:**\n```json\n{json.dumps(act, indent=2)}\n```\n\n")
 
-            # Agent result
+            # Agent script and raw output
+            ar = d.get("agent_result") or {}
+            if ar.get("script"):
+                f.write(f"### {agent} Script\n")
+                f.write(f"```bash\n{ar['script']}\n```\n\n")
+            if ar.get("raw_output"):
+                f.write(f"### {agent} Raw Output\n")
+                f.write(f"```\n{ar['raw_output'][:2000]}\n```\n\n")
+
+            # Agent result summary
             f.write(f"### {agent} Agent Result\n")
             f.write(f"```\n{d['agent_result_text'] or '(no result)'}\n```\n\n")
 

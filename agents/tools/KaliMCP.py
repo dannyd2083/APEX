@@ -1,61 +1,125 @@
 import sys
-from langchain.agents.structured_output import ToolStrategy
+import json
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from langchain_mcp_adapters.tools import load_mcp_tools
-from pydantic import BaseModel
 from agents.config.settings import project_root, ip_settings
-from agents.helpers.token_tracker import token_tracker
 
-class KaliMCPResponse(BaseModel):
-    output: str
 
 class KaliMCP:
     def __init__(self):
         self.config = self._params()
-        self.response_format = ToolStrategy(KaliMCPResponse)
+        # Persistent session state (set by __aenter__)
+        self._cm      = None
+        self._sess_cm = None
+        self._session = None
 
-    def _params(self) -> dict:
+    def _params(self) -> StdioServerParameters:
         return StdioServerParameters(
-            command = sys.executable,
-            args = [
-                f"{project_root}/mcp/mcp_server.py",
+            command=sys.executable,
+            args=[
+                f"{project_root}/mcp/kali_bridge.py",
                 "--server",
-                f"http://{ip_settings.KALI_IP}:5000"
+                f"http://{ip_settings.KALI_IP}:5000",
             ],
         )
 
-    async def _call(self, llm, question):
+    # ------------------------------------------------------------------
+    # Persistent connection context manager
+    # ------------------------------------------------------------------
+
+    async def __aenter__(self):
+        """Open kali_bridge.py once and keep it alive for all calls."""
+        self._cm      = stdio_client(self.config)
+        read, write   = await self._cm.__aenter__()
+        self._sess_cm = ClientSession(read, write)
+        self._session = await self._sess_cm.__aenter__()
+        await self._session.initialize()
+        return self
+
+    async def __aexit__(self, *args):
+        if self._sess_cm:
+            await self._sess_cm.__aexit__(*args)
+        if self._cm:
+            await self._cm.__aexit__(*args)
+        self._session = self._sess_cm = self._cm = None
+
+    # ------------------------------------------------------------------
+    # Internal call — reuses persistent session or opens a one-shot one
+    # ------------------------------------------------------------------
+
+    async def _call_mcp_tool(self, tool_name: str, args: dict) -> str:
+        if self._session:
+            return await self._call_with(self._session, tool_name, args)
+
+        # Fallback: no persistent session — open a temporary one
         async with stdio_client(self.config) as (read, write):
-            async with ClientSession(read, write) as kali_session:
-                await kali_session.initialize() 
-                tools = await load_mcp_tools(kali_session)
-                agent = llm._create_agent(tools, self.response_format)
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await self._call_with(session, tool_name, args)
 
-                result = await agent.ainvoke({
-                    "messages": question
-                })
+    async def _call_with(self, session: ClientSession,
+                         tool_name: str, args: dict) -> str:
+        result = await session.call_tool(tool_name, args)
+        if not result.content:
+            return "(no output)"
+        block = result.content[0]
+        text  = block.text if hasattr(block, "text") else str(block)
+        return self._parse_result(text)
 
-                # Track token usage from agent loop messages
-                messages = result.get("messages", [])
-                total_input = 0
-                total_output = 0
-                call_count = 0
-                for msg in messages:
-                    if hasattr(msg, 'response_metadata'):
-                        usage = msg.response_metadata.get('token_usage', {})
-                        if usage:
-                            total_input += usage.get('prompt_tokens', 0)
-                            total_output += usage.get('completion_tokens', 0)
-                            call_count += 1
-                if call_count > 0:
-                    token_tracker.log_call(
-                        provider="openrouter",
-                        phase="recon",
-                        input_tokens=total_input,
-                        output_tokens=total_output,
-                        model="x-ai/grok-4"
-                    )
-                    print(f"[TOKENS] Recon: {call_count} LLM calls, {total_input} input + {total_output} output tokens")
+    def _parse_result(self, text: str) -> str:
+        try:
+            data   = json.loads(text)
+            stdout = data.get("stdout", "")
+            stderr = data.get("stderr", "")
+            rc     = data.get("return_code", "?")
+            parts  = [f"[exit code: {rc}]"]
+            if stdout:
+                parts.append(f"[stdout]\n{stdout}")
+            if stderr:
+                parts.append(f"[stderr]\n{stderr}")
+            return "\n".join(parts)
+        except Exception:
+            return text
 
-        return result
+    # ------------------------------------------------------------------
+    # Public tool methods
+    # ------------------------------------------------------------------
+
+    async def execute(self, command: str) -> str:
+        return await self._call_mcp_tool("execute_command", {"command": command})
+
+    async def nmap_scan(self, target: str, ports: str = "") -> str:
+        return await self._call_mcp_tool("nmap_scan", {
+            "target": target, "scan_type": "-sV",
+            "ports": ports, "additional_args": "",
+        })
+
+    async def gobuster_scan(self, url: str) -> str:
+        return await self._call_mcp_tool("gobuster_scan", {
+            "url": url, "mode": "dir",
+            "wordlist": "/usr/share/wordlists/dirb/common.txt",
+            "additional_args": "",
+        })
+
+    async def zap_spider(self, url: str, port: int = 8080) -> str:
+        return await self._call_mcp_tool("zap_scan", {
+            "url": url, "mode": "spider", "port": port,
+        })
+
+    async def sqlmap(self, url: str, data: str = "", extra: str = "") -> str:
+        return await self._call_mcp_tool("sqlmap_scan", {
+            "url": url, "data": data, "additional_args": extra,
+        })
+
+    async def autorecon(self, target: str) -> str:
+        return await self._call_mcp_tool("autorecon_scan", {"target": target})
+
+    async def zap_active(self, url: str, port: int = 8080) -> str:
+        scan_out   = await self._call_mcp_tool("zap_scan", {
+            "url": url, "mode": "active", "port": port,
+        })
+        alerts_out = await self._call_mcp_tool("zap_scan", {
+            "url": "", "mode": "alerts", "port": port,
+        })
+        return scan_out + "\n\n[ZAP ALERTS]\n" + alerts_out

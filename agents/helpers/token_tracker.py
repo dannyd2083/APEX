@@ -42,33 +42,52 @@ class TokenTracker:
         self.call_log = []
 
     def log_call(self, provider: str, phase: str, input_tokens: int = 0,
-                 output_tokens: int = 0, model: str = None):
-        """Log a single LLM call."""
+                 output_tokens: int = 0, model: str = None,
+                 actual_cost_usd: float = None):
+        """Log a single LLM call. Pass actual_cost_usd when known (from OpenRouter API)."""
         if provider not in self.usage:
             self.usage[provider] = {
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "calls": 0,
+                "actual_cost_usd": 0.0,
                 "model": model or "unknown"
             }
 
-        self.usage[provider]["input_tokens"] += input_tokens
-        self.usage[provider]["output_tokens"] += output_tokens
-        self.usage[provider]["calls"] += 1
+        self.usage[provider]["input_tokens"]   += input_tokens
+        self.usage[provider]["output_tokens"]  += output_tokens
+        self.usage[provider]["calls"]          += 1
+        self.usage[provider].setdefault("actual_cost_usd", 0.0)
+        if actual_cost_usd is not None:
+            self.usage[provider]["actual_cost_usd"] += actual_cost_usd
         if model:
             self.usage[provider]["model"] = model
 
         self.call_log.append({
-            "timestamp": datetime.now().isoformat(),
-            "provider": provider,
-            "phase": phase,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "model": model
+            "timestamp":       datetime.now().isoformat(),
+            "provider":        provider,
+            "phase":           phase,
+            "input_tokens":    input_tokens,
+            "output_tokens":   output_tokens,
+            "model":           model,
+            "actual_cost_usd": actual_cost_usd,
         })
 
+    def total_actual_cost(self) -> float:
+        """Sum costs per call: use actual USD where reported, token estimate otherwise."""
+        total = 0.0
+        for call in self.call_log:
+            if call.get("actual_cost_usd") is not None:
+                total += call["actual_cost_usd"]
+            else:
+                model = call.get("model", "unknown")
+                pricing = PRICING.get(model, {"input": 0, "output": 0})
+                total += (call.get("input_tokens", 0) / 1_000_000) * pricing["input"]
+                total += (call.get("output_tokens", 0) / 1_000_000) * pricing["output"]
+        return round(total, 6)
+
     def estimate_cost(self) -> Dict[str, float]:
-        """Estimate cost based on token usage."""
+        """Token-based cost estimate (used as fallback when actual cost unavailable)."""
         costs = {}
         total = 0.0
 
@@ -81,9 +100,10 @@ class TokenTracker:
             provider_cost = input_cost + output_cost
 
             costs[provider] = {
-                "input_cost": round(input_cost, 4),
-                "output_cost": round(output_cost, 4),
-                "total_cost": round(provider_cost, 4)
+                "input_cost":       round(input_cost, 4),
+                "output_cost":      round(output_cost, 4),
+                "total_cost":       round(provider_cost, 4),
+                "actual_cost_usd":  round(data.get("actual_cost_usd", 0.0), 6),
             }
             total += provider_cost
 

@@ -1,0 +1,40 @@
+Recon objective: __OBJECTIVE__
+
+Command output:
+__OUTPUT__
+
+Extract all useful findings. Be skeptical of false positives — if a path or endpoint
+returns the same page title or homepage content as the root URL, it is likely a catch-all
+false positive (many web apps return HTTP 200 for all unknown paths). Do NOT add it to
+findings — put it in dead_ends instead. Only report a finding if the evidence clearly
+shows it is real and distinct from the default page.
+
+Path reporting rule: always report the exact full path as found — never collapse to a parent directory.
+If the output contains /a/b/c, report "/a/b/c" not "/a/" or "/a/b/".
+Extract every distinct URL, href, form action, and spider result as its own finding.
+
+Hypothesis rules:
+- Do NOT create a hypothesis about anything already in dead_ends.
+- Hypotheses must be grounded in confirmed findings only — not in scanner noise or unverified paths.
+- If a tool (nikto, gobuster) reports a path but the evidence only shows HTTP 200 with no distinct content, it is a dead_end, not a finding or hypothesis.
+
+Output ONLY this JSON:
+
+{
+  "findings": [
+    {
+      "type": "<service|directory|auth|vulnerability|credential|parameter>",
+      "value": "<what was found>",
+      "confidence": "<high|medium|low>",
+      "evidence": "<which command or output showed this>"
+    }
+  ],
+  "hypotheses": [
+    {"description": "<possible attack path based on findings>", "confidence": <0.0-1.0>}
+  ],
+  "dead_ends": ["<thing tried that returned nothing useful>"],
+
+  "raw_summary": "<2-3 sentence summary of what was found>"
+}
+
+Output only the JSON. No explanation before or after it.

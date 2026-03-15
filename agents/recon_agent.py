@@ -1,26 +1,67 @@
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 from agents.tools.KaliMCP import KaliMCP
 from agents.helpers.save_json import extract_json_from_llm_response
+from agents.helpers.output_parsers import (
+    parse_nmap, parse_gobuster, parse_zap_alerts, parse_zap_spider, parse_autorecon,
+)
 
 
-def _load_prompt() -> str:
-    path = Path(__file__).resolve().parent / "prompts" / "recon_agent_prompt.txt"
+def _load(name: str) -> str:
+    path = Path(__file__).resolve().parent / "prompts" / name
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
+def _extract_script(text: str) -> str:
+    """Strip markdown fences if the LLM wrapped the script in them."""
+    for pattern in [
+        r"```(?:bash|sh)?\s*\r?\n(.*?)```",
+        r"`{3,}(?:bash|sh)?\s*\r?\n(.*?)`{3,}",
+        r"```(?:bash|sh)?(.*?)```",
+    ]:
+        m = re.search(pattern, text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+    return text.strip()
+
+
+def _trim_output(raw: str, head: int = 40000, tail: int = 4000) -> str:
+    """Keep first N + last M chars so results (always at end) are never cut off."""
+    if len(raw) <= head + tail:
+        return raw
+    return raw[:head] + "\n...[middle truncated]...\n" + raw[-tail:]
+
+
+def _extract_exit_code(raw_output: str) -> Optional[int]:
+    """Parse exit code from KaliMCP output format: [exit code: N]"""
+    m = re.search(r"\[exit code:\s*(\d+)\]", raw_output)
+    return int(m.group(1)) if m else None
+
+
+# Tools handled by named MCP methods
+_NAMED_TOOLS = {"nmap", "gobuster", "zap-spider", "zap-active", "sqlmap", "autorecon"}
+
+# Tools whose output is structured — parsed by code, no LLM needed
+_PARSED_TOOLS = {"nmap", "gobuster", "zap-spider", "zap-active", "autorecon"}
+
+
 @dataclass
 class ReconResult:
-    findings:    list = field(default_factory=list)   # list of dicts
-    hypotheses:  list = field(default_factory=list)   # list of dicts
-    dead_ends:   list = field(default_factory=list)   # list of strings
+    findings:    list = field(default_factory=list)
+    hypotheses:  list = field(default_factory=list)
+    dead_ends:   list = field(default_factory=list)
     raw_summary: str  = ""
-    error:       Optional[str] = None                 # set if recon failed
+    error:       Optional[str] = None
+    script:      str  = ""   # the bash script that was generated and run (or tool label)
+    raw_output:  str  = ""   # raw stdout/stderr from Kali
 
 
 class ReconAgent:
@@ -33,94 +74,214 @@ class ReconAgent:
                   objective: str,
                   allowed_tools: Optional[list] = None,
                   context: str = "") -> ReconResult:
-        """
-        Run a focused recon task and return structured findings.
 
-        Args:
-            target_url:    The URL to investigate (e.g. "http://10.x.x.x/")
-            objective:     What to find (e.g. "enumerate web directories")
-            allowed_tools: Which tools the agent may use. None = all available.
-            context:       Any prior findings the agent should know about.
+        primary_tool = (allowed_tools or ["curl"])[0].lower()
 
-        Returns:
-            ReconResult with findings, hypotheses, dead_ends, raw_summary.
-        """
-        tools_str   = ", ".join(allowed_tools) if allowed_tools else "nmap, gobuster, curl, nikto, zap-cli"
+        if primary_tool in _NAMED_TOOLS:
+            # ── Named MCP tool path — no bash script generation ────────────
+            print(f"[ReconAgent] Using named MCP tool: {primary_tool}")
+            try:
+                raw_output = await self._run_named_tool(primary_tool, target_url)
+            except Exception as e:
+                return ReconResult(error=f"Named tool '{primary_tool}' failed: {e}")
+            script = f"# {primary_tool} via named MCP tool"
+        else:
+            # ── Bash script fallback (curl, nikto, complex tasks) ──────────
+            script, raw_output = await self._run_bash_script(
+                target_url, objective, allowed_tools, context
+            )
+            if raw_output.startswith("ERROR:"):
+                return ReconResult(error=raw_output, script=script)
+
+        print(f"[ReconAgent] Output ({primary_tool}): {raw_output[:300]}")
+
+        # ── Structured tools: code parser + LLM hypotheses ────────────────
+        if primary_tool in _PARSED_TOOLS:
+            result = self._parse_structured(primary_tool, raw_output)
+            result.script     = script
+            result.raw_output = raw_output
+            print(f"[ReconAgent] Code-parsed {len(result.findings)} findings")
+            if result.findings:
+                result.hypotheses = self._generate_hypotheses(
+                    tool=primary_tool,
+                    target_url=target_url,
+                    objective=objective,
+                    findings=result.findings,
+                )
+                print(f"[ReconAgent] LLM generated {len(result.hypotheses)} hypotheses")
+            return result
+
+        # ── Unstructured tools: LLM interpret (curl, nikto, sqlmap, etc.) ─
+        interpret_prompt = (
+            _load("recon_interpret_prompt.txt")
+            .replace("__OBJECTIVE__", objective)
+            .replace("__OUTPUT__",    _trim_output(raw_output))
+        )
+        response = self.llm._call(interpret_prompt, phase="recon_interpret", json_mode=True)
+        result = self._parse(response)
+        result.script     = script
+        result.raw_output = raw_output
+        return result
+
+    # ------------------------------------------------------------------
+    # Named tool dispatch
+    # ------------------------------------------------------------------
+
+    async def _run_named_tool(self, tool: str, target_url: str) -> str:
+        if tool == "nmap":
+            parsed = urlparse(target_url)
+            target = parsed.hostname or target_url
+            ports  = str(parsed.port) if parsed.port else ""
+            return await self.kali.nmap_scan(target, ports=ports)
+        elif tool == "gobuster":
+            return await self.kali.gobuster_scan(target_url)
+        elif tool == "zap-spider":
+            return await self.kali.zap_spider(target_url)
+        elif tool == "zap-active":
+            return await self.kali.zap_active(target_url)
+        elif tool == "sqlmap":
+            return await self.kali.sqlmap(target_url)
+        elif tool == "autorecon":
+            parsed = urlparse(target_url)
+            target = parsed.hostname or target_url
+            import asyncio
+            for attempt in range(3):
+                raw = await self.kali.autorecon(target)
+                exit_code = _extract_exit_code(raw)
+                # exit_code None = "?" = HTTP connection failure, retry
+                if exit_code is not None:
+                    return raw
+                print(f"[ReconAgent] autorecon connection failure (attempt {attempt+1}/3), retrying in 5s...")
+                await asyncio.sleep(5)
+            return raw  # return last attempt regardless
+        return f"(unknown named tool: {tool})"
+
+    # ------------------------------------------------------------------
+    # Bash script fallback
+    # ------------------------------------------------------------------
+
+    async def _run_bash_script(self,
+                                target_url: str,
+                                objective: str,
+                                allowed_tools: Optional[list],
+                                context: str) -> tuple[str, str]:
+        tools_str   = ", ".join(allowed_tools) if allowed_tools else "curl, nikto"
         context_str = f"Context from previous steps:\n{context}" if context else ""
 
-        prompt = (
-            _load_prompt()
+        script_prompt = (
+            _load("recon_script_prompt.txt")
             .replace("__TARGET_URL__",    target_url)
             .replace("__OBJECTIVE__",     objective)
             .replace("__ALLOWED_TOOLS__", tools_str)
             .replace("__CONTEXT__",       context_str)
         )
+        script_text = self.llm._call(script_prompt, phase="recon_plan")
+        script = _extract_script(script_text)
 
+        if not script:
+            return "(no script)", "ERROR: LLM produced no script"
+
+        print(f"[ReconAgent] Script:\n{script[:400]}")
+
+        MAX_FIX_ATTEMPTS = 2
+        raw_output = ""
+        for attempt in range(MAX_FIX_ATTEMPTS + 1):
+            try:
+                raw_output = await self.kali.execute(script)
+            except Exception as e:
+                return script, f"ERROR: Kali execution failed: {e}"
+
+            exit_code = _extract_exit_code(raw_output)
+            print(f"[ReconAgent] Attempt {attempt+1} — exit code: {exit_code}")
+
+            if exit_code == 0 or exit_code is None or attempt == MAX_FIX_ATTEMPTS:
+                break
+
+            print(f"[ReconAgent] Script failed (exit {exit_code}), asking LLM to fix...")
+            fix_prompt = (
+                f"The bash script below failed with exit code {exit_code}.\n\n"
+                f"Script:\n```bash\n{script}\n```\n\n"
+                f"Error output:\n{raw_output[:1000]}\n\n"
+                f"Fix the syntax or command error. Output ONLY the corrected bash script, no explanation."
+            )
+            fixed = self.llm._call(fix_prompt, phase="recon_fix")
+            script = _extract_script(fixed) or script
+
+        return script, raw_output
+
+    def _generate_hypotheses(self, tool: str, target_url: str,
+                             objective: str, findings: list) -> list:
+        """Call LLM to generate hypotheses from already code-parsed findings."""
+        findings_text = "\n".join(
+            f"  [{f.get('confidence', 'medium')}] {f.get('type', 'unknown')}: {f.get('value', '')}"
+            for f in findings
+        )
+        prompt = (
+            _load("recon_hypotheses_prompt.txt")
+            .replace("__TARGET_URL__", target_url)
+            .replace("__TOOL__",       tool)
+            .replace("__OBJECTIVE__",  objective)
+            .replace("__FINDINGS__",   findings_text)
+        )
+        raw = self.llm._call(prompt, phase="recon_hypotheses", json_mode=True)
         try:
-            result = await self.kali._call(self.llm, prompt)
-        except Exception as e:
-            print(f"[ReconAgent] KaliMCP call failed: {e}")
-            return ReconResult(error=str(e))
+            data = json.loads(raw)
+            return [
+                {"description": h.get("description", ""),
+                 "confidence":  float(h.get("confidence", 0.5))}
+                for h in data.get("hypotheses", [])
+                if isinstance(h, dict) and h.get("description")
+            ]
+        except Exception:
+            return []
 
-        # Extract the final agent message
-        raw_text = self._extract_last_message(result)
-        if not raw_text:
-            return ReconResult(error="No response from recon agent")
+    def _parse_structured(self, tool: str, raw_output: str) -> ReconResult:
+        """Code-based parsing for tools with structured output — no LLM call."""
+        PARSERS = {
+            "nmap":       parse_nmap,
+            "gobuster":   parse_gobuster,
+            "zap-spider": parse_zap_spider,
+            "zap-active": parse_zap_alerts,
+            "autorecon":  parse_autorecon,
+        }
+        parser = PARSERS.get(tool)
+        findings = parser(raw_output) if parser else []
 
-        return self._parse(raw_text)
-
-    def _extract_last_message(self, result: dict) -> str:
-        # With structured output (KaliMCPResponse), the parsed result lives here
-        sr = result.get("structured_response")
-        if sr and hasattr(sr, "output"):
-            return sr.output
-
-        messages = result.get("messages", [])
-        if not messages:
-            return ""
-        last = messages[-1]
-        if hasattr(last, "content"):
-            return last.content
-        return str(last)
+        if not findings:
+            return ReconResult(
+                raw_summary=f"{tool} completed but found no results",
+                raw_output=raw_output,
+            )
+        return ReconResult(
+            findings=findings,
+            raw_summary=f"{tool}: {len(findings)} findings extracted",
+        )
 
     def _parse(self, raw_text: str) -> ReconResult:
-        """Parse the agent's JSON response into a ReconResult."""
         try:
-            data = extract_json_from_llm_response(raw_text)
+            data = json.loads(raw_text)
         except Exception as e:
-            print(f"[ReconAgent] JSON parse failed: {e}")
-            print(f"[ReconAgent] Raw response: {raw_text[:500]}")
-            return ReconResult(raw_summary=raw_text, error=f"JSON parse failed: {e}")
+            return ReconResult(raw_summary=raw_text[:200], error=f"JSON parse failed: {e}")
 
         if not isinstance(data, dict) or "findings" not in data:
-            print(f"[ReconAgent] Unexpected response shape: {list(data.keys()) if isinstance(data, dict) else type(data)}")
-            return ReconResult(raw_summary=raw_text, error="Missing 'findings' key in response")
+            return ReconResult(raw_summary=raw_text[:200], error="Missing 'findings' key in response")
 
-        # Validate and normalise each finding
-        findings = []
-        for f in data.get("findings", []):
-            if not isinstance(f, dict):
-                continue
-            if not f.get("type") or not f.get("value"):
-                continue
-            findings.append({
+        findings = [
+            {
                 "type":       f.get("type", "unknown"),
                 "value":      f.get("value", ""),
                 "confidence": f.get("confidence", "medium"),
                 "evidence":   f.get("evidence", ""),
-            })
+            }
+            for f in data.get("findings", [])
+            if isinstance(f, dict) and f.get("type") and f.get("value")
+        ]
 
-        # Validate hypotheses
-        hypotheses = []
-        for h in data.get("hypotheses", []):
-            if not isinstance(h, dict):
-                continue
-            if not h.get("description"):
-                continue
-            hypotheses.append({
-                "description": h.get("description", ""),
-                "confidence":  float(h.get("confidence", 0.5)),
-            })
+        hypotheses = [
+            {"description": h.get("description", ""), "confidence": float(h.get("confidence", 0.5))}
+            for h in data.get("hypotheses", [])
+            if isinstance(h, dict) and h.get("description")
+        ]
 
         return ReconResult(
             findings=findings,

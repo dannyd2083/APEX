@@ -1,0 +1,43 @@
+Task that was run: __TASK__
+
+Command output:
+__OUTPUT__
+
+Did the task succeed? Be strict — only mark success=true if the raw output EXPLICITLY proves it.
+
+Rules for success=true:
+- Login success: response must show post-login content (dashboard, profile, logout link) NOT just a login form
+- Credential found: output must contain an actual value (e.g. "password: s3cret") NOT just an HTML input field
+- RCE success: output must contain command result (e.g. "uid=0(root)") NOT just the command itself
+- Data extracted: output must contain the actual sensitive data, not just field names
+- IDOR / access escalation: response must show content only accessible to a higher-privilege role
+  (e.g. admin panel, another user's data) — a 200 with the same public page does NOT count
+- File upload: webshell must respond to a cmd parameter with actual command output, NOT just an upload confirmation message
+
+Rules for success=false:
+- Seeing HTML input fields (type=email, type=password) is NOT finding credentials
+- A page title or homepage content appearing in the response means the path does NOT exist (catch-all)
+- An HTTP 200 status alone does NOT mean success — check the actual content
+- Do not infer success from URL paths or parameter names
+
+Output ONLY this JSON:
+
+{
+  "success": <true|false>,
+  "output_summary": "<one or two sentences — what happened, what the response showed>",
+  "key_facts": [
+    {"fact": "<something important from the output>", "significance": "<why it matters>"}
+  ]
+}
+
+CRITICAL: output_summary and key_facts values must be plain text only.
+Do NOT copy raw tool output (SQL queries, HTML, backslashes, quotes) into any JSON string value.
+Summarize in your own words — no verbatim tool output in the JSON.
+
+URL extraction rule: If the output contains HTML, extract EVERY distinct href or action URL that
+contains query parameters (e.g., href="/admin.php?content=accounts&id=2"). List each as its own
+key_fact with the exact URL path and parameters. These are critical for finding IDOR and access
+control flaws. Example fact: "Found link: /admin.php?content=accounts&id=2" — significance:
+"Page uses numeric id parameter — test adjacent values for IDOR"
+
+Output only the JSON. No explanation before or after it.

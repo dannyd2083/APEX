@@ -358,7 +358,7 @@ class DatabaseLogger:
                    RETURNING task_id""",
                 (self.current_run_id, parent_db_id, task.description, task.status,
                  task.evidence_required, task.attempt_count,
-                 task.max_attempts, task.assigned_to)
+                 task.max_attempts, getattr(task, 'assigned_to', None))
             )
             task_id = cursor.fetchone()[0]
 
@@ -409,10 +409,10 @@ class DatabaseLogger:
 
             cursor.execute(
                 """INSERT INTO findings
-                   (run_id, task_id, type, value, confidence, evidence, is_verified)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   (run_id, type, value, confidence, evidence, is_verified)
+                   VALUES (%s, %s, %s, %s, %s, %s)
                    RETURNING finding_id""",
-                (self.current_run_id, finding.task_id, finding.type,
+                (self.current_run_id, finding.type,
                  finding.value, finding.confidence, finding.evidence,
                  finding.is_verified)
             )
