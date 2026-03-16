@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
-from dataclasses import dataclass, field
+import re  # used in _extract_script, _extract_exit_code
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from agents.tools.KaliMCP import KaliMCP
-from agents.helpers.save_json import extract_json_from_llm_response
 
 
 def _load(name: str) -> str:
@@ -42,32 +41,10 @@ def _extract_exit_code(raw_output: str) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
-_SUCCESS_PATTERNS = [
-    r"rows dumped",
-    r"\[\d+\] entr",        # sqlmap "[N] entries"
-    r"fetched data logged",
-    r"Database:\s+\w",
-    r"\|\s+\w.*\|\s+\w",    # ASCII table row (sqlmap dump)
-    r"uid=\d+\(",           # RCE: uid=0(root)
-    r"session\s+\d+\s+opened",
-    r"Login succeeded",
-    r"HTTP/\S+\s+302",      # redirect after POST login
-    r"password\s*[:=]\s*\S",  # found credential
-]
-
-def _infer_success_from_output(raw: str) -> bool:
-    """Heuristic fallback when LLM JSON is unparseable."""
-    for p in _SUCCESS_PATTERNS:
-        if re.search(p, raw, re.IGNORECASE):
-            return True
-    return False
-
-
 @dataclass
 class ExecuteResult:
     success:        bool
     output_summary: str  = ""
-    key_facts:      list = field(default_factory=list)
     raw_output:     str  = ""
     error:          Optional[str] = None
     script:         str  = ""   # the bash script that was generated and run
@@ -108,7 +85,7 @@ class ExecuteAgent:
         for attempt in range(MAX_FIX_ATTEMPTS + 1):
             try:
                 raw_output = await self.kali.execute(script)
-            except Exception as e:
+            except BaseException as e:
                 return ExecuteResult(success=False, error=f"Kali execution failed: {e}")
 
             exit_code = _extract_exit_code(raw_output)
@@ -152,32 +129,24 @@ class ExecuteAgent:
         try:
             data = json.loads(raw_text)
         except Exception as e:
-            inferred = _infer_success_from_output(raw_output)
             return ExecuteResult(
-                success=inferred,
+                success=False,
                 raw_output=raw_output[:1000],
-                output_summary="(JSON parse failed — inferred from raw output)",
+                output_summary="(JSON parse failed)",
                 error=f"JSON parse failed: {e}",
             )
 
-        if not isinstance(data, dict) or "success" not in data:
-            inferred = _infer_success_from_output(raw_output)
+        if not isinstance(data, dict):
             return ExecuteResult(
-                success=inferred,
+                success=False,
                 raw_output=raw_output[:1000],
-                output_summary="(Missing success key — inferred from raw output)",
-                error="Missing 'success' key in response",
+                output_summary="(Invalid JSON response)",
+                error="Response is not a JSON object",
             )
 
-        key_facts = [
-            {"fact": kf.get("fact", ""), "significance": kf.get("significance", "")}
-            for kf in data.get("key_facts", [])
-            if isinstance(kf, dict) and kf.get("fact")
-        ]
-
+        # success is always False here — coordinator judges success from full context
         return ExecuteResult(
-            success=bool(data.get("success", False)),
+            success=False,
             output_summary=data.get("output_summary", ""),
-            key_facts=key_facts,
-            raw_output=data.get("raw_output", raw_output[:1000]),
+            raw_output=raw_output[:10000],
         )

@@ -12,8 +12,16 @@ from agents.config.settings import project_root
 # Pricing per 1M tokens (approximate, check OpenRouter for current rates)
 # AnythingLLM uses OpenRouter/Grok-4 underneath, so same pricing applies
 PRICING = {
-    "x-ai/grok-4": {"input": 3.00, "output": 15.00},  # $3/1M input, $15/1M output
-    "anythingllm": {"input": 3.00, "output": 15.00},  # Uses Grok-4 via OpenRouter
+    "x-ai/grok-4":                      {"input": 3.00,  "output": 15.00},
+    "anythingllm":                      {"input": 3.00,  "output": 15.00},
+    "google/gemini-2.0-flash-exp:free":          {"input": 0.0, "output": 0.0},
+    "meta-llama/llama-3.3-70b-instruct:free":    {"input": 0.0, "output": 0.0},
+    "qwen/qwen2.5-72b-instruct:free":            {"input": 0.0, "output": 0.0},
+    "openai/gpt-oss-120b:free":                  {"input": 0.0,   "output": 0.0},
+    "anthropic/claude-opus-4-5":                 {"input": 15.00, "output": 75.00},
+    "anthropic/claude-3.5-haiku":                {"input": 0.80,  "output": 4.00},
+    "meta-llama/llama-3.3-70b-instruct:free": {"input": 0.0, "output": 0.0},
+    "deepseek/deepseek-r1:free":        {"input": 0.0,   "output": 0.0},
 }
 
 

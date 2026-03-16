@@ -56,7 +56,6 @@ _PARSED_TOOLS = {"nmap", "gobuster", "zap-spider", "zap-active", "autorecon"}
 @dataclass
 class ReconResult:
     findings:    list = field(default_factory=list)
-    hypotheses:  list = field(default_factory=list)
     dead_ends:   list = field(default_factory=list)
     raw_summary: str  = ""
     error:       Optional[str] = None
@@ -73,7 +72,8 @@ class ReconAgent:
                   target_url: str,
                   objective: str,
                   allowed_tools: Optional[list] = None,
-                  context: str = "") -> ReconResult:
+                  context: str = "",
+                  goal: str = "shell") -> ReconResult:
 
         primary_tool = (allowed_tools or ["curl"])[0].lower()
 
@@ -82,7 +82,7 @@ class ReconAgent:
             print(f"[ReconAgent] Using named MCP tool: {primary_tool}")
             try:
                 raw_output = await self._run_named_tool(primary_tool, target_url)
-            except Exception as e:
+            except BaseException as e:
                 return ReconResult(error=f"Named tool '{primary_tool}' failed: {e}")
             script = f"# {primary_tool} via named MCP tool"
         else:
@@ -95,20 +95,12 @@ class ReconAgent:
 
         print(f"[ReconAgent] Output ({primary_tool}): {raw_output[:300]}")
 
-        # ── Structured tools: code parser + LLM hypotheses ────────────────
+        # ── Structured tools: code parser ─────────────────────────────────
         if primary_tool in _PARSED_TOOLS:
             result = self._parse_structured(primary_tool, raw_output)
             result.script     = script
             result.raw_output = raw_output
             print(f"[ReconAgent] Code-parsed {len(result.findings)} findings")
-            if result.findings:
-                result.hypotheses = self._generate_hypotheses(
-                    tool=primary_tool,
-                    target_url=target_url,
-                    objective=objective,
-                    findings=result.findings,
-                )
-                print(f"[ReconAgent] LLM generated {len(result.hypotheses)} hypotheses")
             return result
 
         # ── Unstructured tools: LLM interpret (curl, nikto, sqlmap, etc.) ─
@@ -134,7 +126,7 @@ class ReconAgent:
             ports  = str(parsed.port) if parsed.port else ""
             return await self.kali.nmap_scan(target, ports=ports)
         elif tool == "gobuster":
-            return await self.kali.gobuster_scan(target_url)
+            return await self.kali.gobuster_scan(await self._resolve_vhost(target_url))
         elif tool == "zap-spider":
             return await self.kali.zap_spider(target_url)
         elif tool == "zap-active":
@@ -159,6 +151,25 @@ class ReconAgent:
     # ------------------------------------------------------------------
     # Bash script fallback
     # ------------------------------------------------------------------
+
+    async def _resolve_vhost(self, url: str) -> str:
+        """If url uses a bare IP, check Kali /etc/hosts for a hostname and return hostname URL."""
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        if not re.match(r"^\d+\.\d+\.\d+\.\d+$", host):
+            return url  # already a hostname
+        raw = await self.kali.execute(f"grep -m1 '^{host}' /etc/hosts")
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line or line.startswith("["):
+                continue  # skip KaliMCP metadata lines ([exit code:], [stdout], etc.)
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == host:
+                hostname = parts[1]
+                new_url = url.replace(host, hostname, 1)
+                print(f"[ReconAgent] vhost resolved: {url} -> {new_url}")
+                return new_url
+        return url
 
     async def _run_bash_script(self,
                                 target_url: str,
@@ -188,7 +199,7 @@ class ReconAgent:
         for attempt in range(MAX_FIX_ATTEMPTS + 1):
             try:
                 raw_output = await self.kali.execute(script)
-            except Exception as e:
+            except BaseException as e:
                 return script, f"ERROR: Kali execution failed: {e}"
 
             exit_code = _extract_exit_code(raw_output)
@@ -208,32 +219,6 @@ class ReconAgent:
             script = _extract_script(fixed) or script
 
         return script, raw_output
-
-    def _generate_hypotheses(self, tool: str, target_url: str,
-                             objective: str, findings: list) -> list:
-        """Call LLM to generate hypotheses from already code-parsed findings."""
-        findings_text = "\n".join(
-            f"  [{f.get('confidence', 'medium')}] {f.get('type', 'unknown')}: {f.get('value', '')}"
-            for f in findings
-        )
-        prompt = (
-            _load("recon_hypotheses_prompt.txt")
-            .replace("__TARGET_URL__", target_url)
-            .replace("__TOOL__",       tool)
-            .replace("__OBJECTIVE__",  objective)
-            .replace("__FINDINGS__",   findings_text)
-        )
-        raw = self.llm._call(prompt, phase="recon_hypotheses", json_mode=True)
-        try:
-            data = json.loads(raw)
-            return [
-                {"description": h.get("description", ""),
-                 "confidence":  float(h.get("confidence", 0.5))}
-                for h in data.get("hypotheses", [])
-                if isinstance(h, dict) and h.get("description")
-            ]
-        except Exception:
-            return []
 
     def _parse_structured(self, tool: str, raw_output: str) -> ReconResult:
         """Code-based parsing for tools with structured output — no LLM call."""
@@ -277,15 +262,8 @@ class ReconAgent:
             if isinstance(f, dict) and f.get("type") and f.get("value")
         ]
 
-        hypotheses = [
-            {"description": h.get("description", ""), "confidence": float(h.get("confidence", 0.5))}
-            for h in data.get("hypotheses", [])
-            if isinstance(h, dict) and h.get("description")
-        ]
-
         return ReconResult(
             findings=findings,
-            hypotheses=hypotheses,
             dead_ends=data.get("dead_ends", []),
             raw_summary=data.get("raw_summary", ""),
         )

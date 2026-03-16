@@ -1,5 +1,5 @@
-OPENROUTER_MODEL_NAME = "x-ai/grok-4"   # coordinator — strategic decisions
-WORKER_MODEL_NAME     = "x-ai/grok-4"   # recon/execute agents — grok-3-mini has no tool calling
+OPENROUTER_MODEL_NAME = "anthropic/claude-opus-4-5"          # coordinator — strongest reasoning
+WORKER_MODEL_NAME     = "anthropic/claude-3.5-haiku"          # recon/execute agents — cheap workers
 
 TARGET_OS = "METASPLOITABLE"
 TARGET_VERSION = "2"

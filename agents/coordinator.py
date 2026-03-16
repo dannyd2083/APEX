@@ -52,24 +52,27 @@ class Coordinator:
         self.state.create_labeled_task(None,
             f"Compromise {self.state.target_url} — goal: {self.state.goal}",
             status="in_progress")
-        self.state.create_labeled_task("1", "Discover services and attack surface")
-        self.state.create_labeled_task("1", "Exploit vulnerabilities and achieve goal")
+        self.state.create_labeled_task("1", "Discover — map services, endpoints, and attack surface")
+        self.state.create_labeled_task("1", "Authenticate — gain valid session or credentials")
+        self.state.create_labeled_task("1", "Exploit — use access for RCE or file execution")
+        self.state.create_labeled_task("1", "Escalate — read flags or achieve full access")
 
         last_result = "No actions taken yet."
+        _run_error  = None
 
-        # Open both KaliMCP subprocesses once — reused for the entire run.
-        # Use async with so anyio cancel scopes are always closed in the same task.
-        async with self.recon.kali, self.execute.kali:
-          try:
-            _run_error = None
-            while not self.state.stop_reason():
+        while True:
+          # Open both KaliMCP subprocesses — reopened on each extension iteration.
+          # Use async with so anyio cancel scopes are always closed in the same task.
+          async with self.recon.kali, self.execute.kali:
+            try:
+              while not self.state.stop_reason():
                 turn = self.state.total_turns + 1
                 print(f"\n{'='*60}")
                 print(f"[Coordinator] Turn {turn}")
 
                 # 1. Print task tree + state summary
                 print(f"\n[Task Tree]\n{self.state.task_tree_snapshot()}")
-                print(f"[State] findings={len(self.state.findings)} | hypotheses={len(self.state.hypotheses)} | failed={len(self.state.failed_approaches)}")
+                print(f"[State] findings={len(self.state.findings)} | failed={len(self.state.failed_approaches)}")
                 if self.state.action_history:
                     print(f"[History] {self.state.action_history[-1]}")
 
@@ -114,7 +117,6 @@ class Coordinator:
                 agent_result      = None
                 agent_result_text = ""
                 findings_before   = len(self.state.findings)
-                hypotheses_before = len(self.state.hypotheses)
                 failed_before     = len(self.state.failed_approaches)
     
                 if agent == "recon":
@@ -137,7 +139,6 @@ class Coordinator:
                     self.state.current_task_id = self.state.root_task_id
                     agent_result = {
                         "findings":   result.findings,
-                        "hypotheses": result.hypotheses,
                         "dead_ends":  result.dead_ends,
                         "raw_summary": result.raw_summary,
                         "error":      result.error,
@@ -166,7 +167,6 @@ class Coordinator:
                     agent_result = {
                         "success":        result.success,
                         "output_summary": result.output_summary,
-                        "key_facts":      result.key_facts,
                         "raw_output":     result.raw_output,
                         "error":          result.error,
                         "script":         result.script,
@@ -185,7 +185,7 @@ class Coordinator:
                         llm_response=response, reasoning=reasoning,
                         action=action, agent_type="done",
                         agent_result=None, agent_result_text="",
-                        findings_added=[], hypotheses_added=[], failed_added=[],
+                        findings_added=[], failed_added=[],
                     )
                     break
     
@@ -269,10 +269,6 @@ class Coordinator:
                         {"type": f.type, "value": f.value, "confidence": f.confidence, "evidence": f.evidence}
                         for f in self.state.findings[findings_before:]
                     ],
-                    hypotheses_added=[
-                        {"description": h.description, "confidence": h.confidence}
-                        for h in self.state.hypotheses[hypotheses_before:]
-                    ],
                     failed_added=self.state.failed_approaches[failed_before:],
                 )
     
@@ -284,9 +280,24 @@ class Coordinator:
                 self.state.consume(cost_usd=turn_cost)
                 print(f"[Coordinator] Turn cost: ${turn_cost:.4f} | Total: ${self.state.total_cost_usd:.4f}")
     
-          except Exception as e:
-            _run_error = str(e)
-            print(f"[Coordinator] CRASHED: {e}")
+            except Exception as e:
+              _run_error = str(e)
+              print(f"[Coordinator] CRASHED: {e}")
+
+          # Extension prompt — ask user to add more turns if budget exhausted
+          if (self.state.stop_reason() == "budget_turns_exceeded"
+                  and not self.state.goal_achieved
+                  and not _run_error):
+              try:
+                  raw   = input(f"\n[+] {self.state.total_turns} turns used. Add how many more? (0 to stop): ").strip()
+                  extra = int(raw) if raw else 0
+              except (ValueError, EOFError):
+                  extra = 0
+              if extra > 0:
+                  self.state.max_turns += extra
+                  print(f"[Coordinator] +{extra} turns — {self.state.max_turns - self.state.total_turns} remaining")
+                  continue
+          break
 
         reason = self.state.stop_reason() or (_run_error and f"error: {_run_error}") or "unknown"
         print(f"\n{'='*60}")
@@ -304,11 +315,6 @@ class Coordinator:
                     {"type": f.type, "value": f.value,
                      "confidence": f.confidence, "evidence": f.evidence}
                     for f in self.state.findings
-                ],
-                "hypotheses": [
-                    {"description": h.description, "confidence": h.confidence,
-                     "status": h.status}
-                    for h in self.state.hypotheses
                 ],
             }
         )
@@ -362,16 +368,6 @@ class Coordinator:
         except Exception:
             return True  # on error, assume real — don't silently drop findings
 
-    def _prune_hypotheses(self) -> None:
-        """Reject any active hypothesis whose key path is already in failed_approaches."""
-        for h in self.state.hypotheses:
-            if h.status != "active":
-                continue
-            hyp_path = self._extract_path(h.description)
-            if hyp_path and any(hyp_path in fa for fa in self.state.failed_approaches):
-                self.state.update_hypothesis(h.id, status="rejected")
-                print(f"[Coordinator] Rejected stale hypothesis: {h.description[:80]}")
-
     def _extract_path(self, value: str) -> Optional[str]:
         """Extract the first URL path (starts with /) from a finding value string."""
         m = re.search(r"(/[^\s\"'<>]+)", value)
@@ -419,50 +415,18 @@ class Coordinator:
                 evidence=f.get("evidence", ""),
             )
 
-        for h in result.hypotheses:
-            desc = h.get("description", "")
-            # Reject hypotheses that reference a path already proven to be a catch-all
-            hyp_path = self._extract_path(desc)
-            if hyp_path and hyp_path in catchall_paths:
-                print(f"[Coordinator] Rejected hypothesis about catch-all path: {desc[:80]}")
-                continue
-            self.state.add_hypothesis(
-                description=desc,
-                confidence=float(h.get("confidence", 0.5)),
-            )
-
         for d in result.dead_ends:
             self.state.add_failed_approach(d)
 
-        self._prune_hypotheses()
-
     def _ingest_execute(self, result: ExecuteResult) -> None:
-        # Only store key_facts when the task actually succeeded —
-        # failed task key_facts are status messages ("login failed", "form not found")
-        # that pollute state with noise. failed_approaches already captures the failure.
-        if result.success:
-            for kf in result.key_facts:
-                fact  = kf.get("fact", "")
-                ftype = "credential" if any(
-                    w in fact.lower() for w in ("password", "session", "cookie", "token")
-                ) else "parameter"
-                self.state.add_finding(
-                    type=ftype,
-                    value=fact,
-                    confidence="high",
-                    evidence=result.output_summary,
-                    verified=True,
-                )
         if result.success:
             # Signal that an authenticated session is now active —
-            # coordinator should pivot to recon on the post-auth surface
+            # coordinator will see raw output and decide next steps
             login_keywords = ("welcome", "logout", "logged in", "dashboard", "admin")
-            if any(w in (result.output_summary + " ".join(
-                kf.get("fact", "") for kf in result.key_facts
-            )).lower() for w in login_keywords):
+            if any(w in result.output_summary.lower() for w in login_keywords):
                 self.state.add_finding(
                     type="authenticated",
-                    value=f"Active session established — cookie saved to /tmp/plante_session.txt",
+                    value="Active session established — cookie saved to /tmp/plante_session.txt",
                     confidence="high",
                     evidence=result.output_summary,
                     verified=True,
@@ -470,7 +434,6 @@ class Coordinator:
 
         if not result.success and result.output_summary:
             self.state.add_failed_approach(result.output_summary[:200])
-            self._prune_hypotheses()
 
     # ------------------------------------------------------------------
     # Format results for __LAST_RESULT__ in next prompt
@@ -480,19 +443,23 @@ class Coordinator:
         lines = ["[Recon Agent Result]", f"Summary: {result.raw_summary}"]
         for f in result.findings:
             lines.append(f"  FINDING [{f['confidence']}] {f['type']}: {f['value']}")
-        for h in result.hypotheses:
-            lines.append(f"  HYPOTHESIS [{h['confidence']:.0%}]: {h['description']}")
         for d in result.dead_ends:
             lines.append(f"  DEAD END: {d}")
+        if result.raw_output:
+            raw = result.raw_output
+            truncated = len(raw) > 10000
+            lines.append(f"\n[Raw Output]{' (truncated)' if truncated else ''}\n{raw[:10000]}")
         return "\n".join(lines)
 
     def _format_execute(self, result: ExecuteResult) -> str:
         lines = [f"[Execute Agent Result] success={result.success}"]
         lines.append(f"Summary: {result.output_summary}")
-        for kf in result.key_facts:
-            lines.append(f"  FACT: {kf['fact']} — {kf.get('significance', '')}")
         if result.error:
             lines.append(f"  ERROR: {result.error}")
+        if result.raw_output:
+            raw = result.raw_output
+            truncated = len(raw) > 10000
+            lines.append(f"\n[Raw Output]{' (truncated)' if truncated else ''}\n{raw[:10000]}")
         return "\n".join(lines)
 
 

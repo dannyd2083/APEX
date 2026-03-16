@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Default configuration
 DEFAULT_KALI_SERVER = "http://localhost:5000" # change to your linux IP
-DEFAULT_REQUEST_TIMEOUT = 600  # 10 minutes default timeout for API requests
+DEFAULT_REQUEST_TIMEOUT = 900  # 15 minutes default timeout for API requests
 
 class KaliToolsClient:
     """Client for communicating with the Kali Linux Tools API Server"""
@@ -151,7 +151,7 @@ def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
         return kali_client.execute_command(cmd)
 
     @mcp.tool()
-    def gobuster_scan(url: str, mode: str = "dir", wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: str = "") -> Dict[str, Any]:
+    def gobuster_scan(url: str, mode: str = "dir", wordlist: str = "/usr/share/wordlists/dirb/big.txt", additional_args: str = "") -> Dict[str, Any]:
         """
         Execute Gobuster to find directories, DNS subdomains, or virtual hosts.
 
@@ -164,7 +164,7 @@ def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
         Returns:
             Scan results
         """
-        cmd = f"timeout 300 gobuster {mode} -u {url} -w {wordlist} -t 100 -q"
+        cmd = f"gobuster {mode} -u {url} -w {wordlist} -t 100 -q"
         if additional_args:
             cmd += f" {additional_args}"
         return kali_client.execute_command(cmd)
@@ -227,7 +227,7 @@ def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
             base += f" --data='{data}'"
         if additional_args:
             base += f" {additional_args}"
-        cmd = f"timeout 300 {base}"
+        cmd = base
         return kali_client.execute_command(cmd)
 
     @mcp.tool()
@@ -247,9 +247,21 @@ def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
         log  = f"/tmp/ar_{safe}.txt"
         # Run autorecon directly — modern autorecon handles non-TTY environments.
         # Strip ANSI colour codes from the log before showing it.
+        # Auto-detect virtual hostname from HTTP redirect and add to /etc/hosts
+        hosts_inject = (
+            f"REDIRECT=$(curl -s -o /dev/null -w '%{{redirect_url}}' --max-time 5 http://{target}/ 2>/dev/null || true) ; "
+            f"if [ -n \"$REDIRECT\" ]; then "
+            f"  VHOST=$(echo \"$REDIRECT\" | sed 's|https\\?://||' | cut -d'/' -f1 | cut -d':' -f1) ; "
+            f"  if [ -n \"$VHOST\" ] && ! grep -q \"$VHOST\" /etc/hosts 2>/dev/null; then "
+            f"    echo '{target} '\"$VHOST\" | sudo tee -a /etc/hosts > /dev/null ; "
+            f"    echo \"[hosts] Added {target} $VHOST\" ; "
+            f"  fi ; "
+            f"fi ; "
+        )
         cmd  = (
             f"rm -rf {out} {log} ; "
-            f"unbuffer sudo timeout 120 autorecon {target} --output {out} --only-scans-dir --exclude-tags long "
+            f"{hosts_inject}"
+            f"unbuffer sudo autorecon {target} --output {out} --only-scans-dir --exclude-tags long "
             f"  > {log} 2>&1 ; "
             f"echo '=== AUTORECON LIVE (last 20 lines) ==='; "
             f"tail -60 {log} 2>/dev/null | sed 's/\\x1b\\[[0-9;]*[mGKHJF]//g' ; "

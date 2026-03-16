@@ -59,7 +59,6 @@ class RunLogger:
                  agent_result:      Optional[dict],
                  agent_result_text: str,
                  findings_added:    list,
-                 hypotheses_added:  list,
                  failed_added:      list) -> None:
 
         ts = datetime.now().isoformat()
@@ -77,7 +76,6 @@ class RunLogger:
             "agent_result":      agent_result,
             "agent_result_text": agent_result_text,
             "findings_added":    findings_added,
-            "hypotheses_added":  hypotheses_added,
             "failed_added":      failed_added,
         }
 
@@ -124,11 +122,6 @@ class RunLogger:
             for f in d["findings_added"]
         ) or "(none)"
 
-        hypotheses_lines = "\n".join(
-            f"- [{h.get('confidence', 0):.0%}] {h.get('description','?')}"
-            for h in d["hypotheses_added"]
-        ) or "(none)"
-
         failed_lines = "\n".join(f"- {a}" for a in d["failed_added"]) or "(none)"
 
         with open(self.md_path, "a", encoding="utf-8") as f:
@@ -167,7 +160,6 @@ class RunLogger:
             # State changes
             f.write("### State Changes\n\n")
             f.write(f"**Findings added ({len(d['findings_added'])}):**\n{findings_lines}\n\n")
-            f.write(f"**Hypotheses added ({len(d['hypotheses_added'])}):**\n{hypotheses_lines}\n\n")
             f.write(f"**Failed approaches added ({len(d['failed_added'])}):**\n{failed_lines}\n\n")
 
             f.write("---\n")
@@ -179,7 +171,6 @@ class RunLogger:
         turns         = final_state.get("total_turns", "?")
         cost          = final_state.get("total_cost_usd", 0)
         findings      = final_state.get("findings", [])
-        hypotheses    = final_state.get("hypotheses", [])
 
         with open(self.md_path, "a", encoding="utf-8") as f:
             f.write(f"\n## Final Result\n\n")
@@ -195,8 +186,3 @@ class RunLogger:
                         f"{finding.get('type','?')}: {finding.get('value','?')}  \n")
                 if finding.get("evidence"):
                     f.write(f"  *{finding['evidence']}*  \n")
-
-            f.write("\n### All Hypotheses\n")
-            for h in hypotheses:
-                f.write(f"- [{h.get('confidence',0):.0%}] [{h.get('status','?')}] "
-                        f"{h.get('description','?')}  \n")

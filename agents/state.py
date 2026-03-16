@@ -22,25 +22,8 @@ class Finding:
     confidence:  str    # low, medium, high
     evidence:    str    # what proves this
 
-    task_id:     Optional[str] = None
     is_verified: bool = False   # True = Execute Agent confirmed it
-
-    created_at:  str = field(default_factory=_now)
     db_id:       Optional[int] = None
-
-
-@dataclass
-class Hypothesis:
-    id:          str
-    session_id:  int
-    description: str
-    confidence:  float  # 0.0 to 1.0
-
-    status:     str  = 'active'   # active, confirmed, rejected
-    supporting: list = field(default_factory=list)  # Finding ids
-
-    created_at: str = field(default_factory=_now)
-    db_id:      Optional[int] = None
 
 
 @dataclass
@@ -56,8 +39,6 @@ class Task:
     parent_id:  Optional[str] = None
     children:   list = field(default_factory=list)  # task ids
 
-    source_finding_id: Optional[str] = None  # which finding spawned this task
-
     evidence_required: str               = ""
     evidence_found:    Optional[Finding] = None
 
@@ -68,9 +49,6 @@ class Task:
     updated_at: str = field(default_factory=_now)
     db_id:      Optional[int] = None
 
-    @property
-    def can_retry(self) -> bool:
-        return self.attempt_count < self.max_attempts and self.status != 'completed'
 
 
 @dataclass
@@ -89,7 +67,6 @@ class PentestState:
     current_task_id: Optional[str] = None
 
     findings:          list = field(default_factory=list)   # List[Finding]
-    hypotheses:        list = field(default_factory=list)   # List[Hypothesis], sorted by confidence
     failed_approaches: list = field(default_factory=list)   # strings, redundancy gate checks this
     action_history:    list = field(default_factory=list)   # agent types with result summaries
 
@@ -105,8 +82,7 @@ class PentestState:
 
     def create_task(self, description: str, evidence_required: str = "",
                     parent_id: Optional[str] = None, max_attempts: int = 3,
-                    task_type: str = "discover",
-                    source_finding_id: Optional[str] = None) -> Task:
+                    task_type: str = "discover") -> Task:
         task = Task(
             id=f"task_{_id()}",
             session_id=self.session_id,
@@ -115,7 +91,6 @@ class PentestState:
             parent_id=parent_id,
             max_attempts=max_attempts,
             task_type=task_type,
-            source_finding_id=source_finding_id,
         )
         self.tasks[task.id] = task
 
@@ -153,25 +128,8 @@ class PentestState:
                 updated_at=task.updated_at,
             )
 
-    def set_current_task(self, task_id: str) -> None:
-        if task_id not in self.tasks:
-            raise KeyError(f"Task '{task_id}' not found")
-        self.current_task_id = task_id
-        self.update_task_status(task_id, 'in_progress')
-
-    def get_pending_tasks(self) -> list:
-        return [t for t in self.tasks.values() if t.status == 'pending']
-
-    def get_retryable_tasks(self) -> list:
-        """Failed tasks that haven't hit max_attempts yet."""
-        return [t for t in self.tasks.values() if t.status == 'failed' and t.can_retry]
-
-    def finding_has_task(self, finding_id: str) -> bool:
-        """Return True if an exploit/verify task already exists for this finding."""
-        return any(t.source_finding_id == finding_id for t in self.tasks.values())
-
     def add_finding(self, type: str, value: str, confidence: str, evidence: str,
-                    task_id: Optional[str] = None, verified: bool = False) -> Finding:
+                    verified: bool = False) -> Finding:
         f = Finding(
             id=f"find_{_id()}",
             session_id=self.session_id,
@@ -179,7 +137,6 @@ class PentestState:
             value=value,
             confidence=confidence,
             evidence=evidence,
-            task_id=task_id,
             is_verified=verified,
         )
         self.findings.append(f)
@@ -188,33 +145,6 @@ class PentestState:
             f.db_id = self.db.log_finding(f)
 
         return f
-
-    def add_hypothesis(self, description: str, confidence: float) -> Hypothesis:
-        h = Hypothesis(
-            id=f"hyp_{_id()}",
-            session_id=self.session_id,
-            description=description,
-            confidence=max(0.0, min(1.0, confidence)),
-        )
-        self.hypotheses.append(h)
-        self.hypotheses.sort(key=lambda x: x.confidence, reverse=True)
-
-        if self.db:
-            h.db_id = self.db.log_hypothesis(h)
-
-        return h
-
-    def update_hypothesis(self, hypothesis_id: str, confidence: Optional[float] = None,
-                          status: Optional[str] = None) -> None:
-        for h in self.hypotheses:
-            if h.id == hypothesis_id:
-                if confidence is not None:
-                    h.confidence = max(0.0, min(1.0, confidence))
-                if status is not None:
-                    h.status = status
-                self.hypotheses.sort(key=lambda x: x.confidence, reverse=True)
-                return
-        raise KeyError(f"Hypothesis '{hypothesis_id}' not found")
 
     def record_action(self, entry: str) -> None:
         self.action_history.append(entry)
@@ -291,18 +221,12 @@ class PentestState:
         if task:
             task.note = note[:120]
 
-    def get_findings_by_type(self, type: str) -> list:
-        return [f for f in self.findings if f.type == type]
-
     def consume(self, cost_usd: float = 0.0) -> None:
         self.total_cost_usd += cost_usd
         self.total_turns += 1
 
         if self.db:
             self.db.update_run_budget(self.session_id, self.total_cost_usd, self.total_turns)
-
-    def within_budget(self) -> bool:
-        return self.total_cost_usd < self.max_cost_usd and self.total_turns < self.max_turns
 
     def stop_reason(self) -> Optional[str]:
         if self.goal_achieved:
@@ -354,13 +278,6 @@ class PentestState:
                 for f in self._prioritized_findings()
             ],
 
-            "top_hypotheses": [
-                {"description": h.description,
-                 "confidence": h.confidence, "status": h.status}
-                for h in self.hypotheses
-                if h.status != "rejected"
-            ][:5],
-
             "failed_approaches": self.failed_approaches,
 
             # Full action history with summaries — the brain's episodic memory
@@ -377,5 +294,5 @@ class PentestState:
         return (
             f"[{self.target_name}] goal={'DONE' if self.goal_achieved else self.goal} | "
             f"tasks={completed}/{len(self.tasks)} | findings={len(self.findings)} | "
-            f"turns={self.total_turns} | cost=${self.total_cost_usd:.4f}"
+            f"failed={len(self.failed_approaches)} | turns={self.total_turns} | cost=${self.total_cost_usd:.4f}"
         )
