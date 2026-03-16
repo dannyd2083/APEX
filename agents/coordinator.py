@@ -20,6 +20,17 @@ from agents.state import PentestState
 from agents.helpers.token_tracker import token_tracker
 
 
+_HEAD = 5_000
+_TAIL = 15_000
+
+def _fmt_raw(raw: str) -> str:
+    """Format raw tool output for the coordinator prompt — head + tail so results at the end are never lost."""
+    if len(raw) <= _HEAD + _TAIL:
+        return f"\n[Raw Output]\n{raw}"
+    return (f"\n[Raw Output] (truncated — first {_HEAD} + last {_TAIL} chars)\n"
+            f"{raw[:_HEAD]}\n...[middle truncated]...\n{raw[-_TAIL:]}")
+
+
 def _load_prompt() -> str:
     path = Path(__file__).resolve().parent / "prompts" / "coordinator_prompt.txt"
     with open(path, "r", encoding="utf-8") as f:
@@ -449,9 +460,7 @@ class Coordinator:
         for d in result.dead_ends:
             lines.append(f"  DEAD END: {d}")
         if result.raw_output:
-            raw = result.raw_output
-            truncated = len(raw) > 10000
-            lines.append(f"\n[Raw Output]{' (truncated)' if truncated else ''}\n{raw[:10000]}")
+            lines.append(_fmt_raw(result.raw_output))
         return "\n".join(lines)
 
     def _format_execute(self, result: ExecuteResult) -> str:
@@ -460,9 +469,7 @@ class Coordinator:
         if result.error:
             lines.append(f"  ERROR: {result.error}")
         if result.raw_output:
-            raw = result.raw_output
-            truncated = len(raw) > 10000
-            lines.append(f"\n[Raw Output]{' (truncated)' if truncated else ''}\n{raw[:10000]}")
+            lines.append(_fmt_raw(result.raw_output))
         return "\n".join(lines)
 
 

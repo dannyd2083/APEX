@@ -145,8 +145,13 @@ class ExecuteAgent:
             )
 
         # success is always False here — coordinator judges success from full context
+        head, tail = 5_000, 15_000
+        if len(raw_output) <= head + tail:
+            trimmed = raw_output
+        else:
+            trimmed = raw_output[:head] + "\n...[middle truncated]...\n" + raw_output[-tail:]
         return ExecuteResult(
             success=False,
             output_summary=data.get("output_summary", ""),
-            raw_output=raw_output[:10000],
+            raw_output=trimmed,
         )
