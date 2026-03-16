@@ -59,6 +59,7 @@ class Coordinator:
 
         last_result = "No actions taken yet."
         _run_error  = None
+        _gave_up    = False
 
         while True:
           # Open both KaliMCP subprocesses — reopened on each extension iteration.
@@ -177,8 +178,9 @@ class Coordinator:
                         self.state.mark_goal_achieved(evidence=action.get("evidence", ""))
                         print(f"[Coordinator] GOAL ACHIEVED: {action.get('evidence', '')}")
                     else:
+                        _gave_up = True
                         print(f"[Coordinator] Giving up: {action.get('reason', '')}")
-    
+
                     self.logger.log_turn(
                         turn=turn, vault_context=rag_context,
                         state_snapshot=snapshot_dict, prompt=prompt,
@@ -284,8 +286,8 @@ class Coordinator:
               _run_error = str(e)
               print(f"[Coordinator] CRASHED: {e}")
 
-          # Extension prompt — ask user to add more turns if budget exhausted
-          if (self.state.stop_reason() == "budget_turns_exceeded"
+          # Extension prompt — ask user to add more turns if budget exhausted or coordinator gave up
+          if ((self.state.stop_reason() == "budget_turns_exceeded" or _gave_up)
                   and not self.state.goal_achieved
                   and not _run_error):
               try:
@@ -295,6 +297,7 @@ class Coordinator:
                   extra = 0
               if extra > 0:
                   self.state.max_turns += extra
+                  _gave_up = False
                   print(f"[Coordinator] +{extra} turns — {self.state.max_turns - self.state.total_turns} remaining")
                   continue
           break

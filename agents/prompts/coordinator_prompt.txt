@@ -143,10 +143,16 @@ The execute agent will probe field names itself — you do not need perfect form
 
 IMPORTANT — web form execution rules (always include these in execute tasks involving forms):
 - Cookie jar: instruct the agent to use COOK=/tmp/plante_session.txt for ALL curl requests
-- CSRF token: if the form may have a hidden token field (user_token, csrf_token, _token, etc.),
+- CSRF token (curl): if the form may have a hidden token field (user_token, csrf_token, _token, etc.),
   instruct the agent to GET the page first (saving cookies with -c $COOK), extract any hidden
   input field value, then POST with -b $COOK including the token in one single command
-- Single script: ALL steps (GET token + POST form + verify result) MUST run in one bash script
+- CSRF token (sqlmap): NEVER manually extract _token and pass it statically to sqlmap.
+  sqlmap will reuse an expired token across hundreds of requests, getting 419 every time.
+  Instead, always include these two flags so sqlmap refreshes the token automatically:
+    --csrf-token=_token --csrf-url="http://target/the-form-page"
+  Example: sqlmap -u "http://target/forget-password" --data "email=x&_token=x" -p email
+           --csrf-token=_token --csrf-url="http://target/forget-password" --batch | cat
+- Single script: ALL steps MUST run in one bash script
   because shell variables do not persist between separate commands
 
 ---
