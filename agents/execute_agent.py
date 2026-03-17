@@ -77,7 +77,45 @@ class ExecuteAgent:
         if not script:
             return ExecuteResult(success=False, error="LLM produced no script")
 
+        # Safety: | head closes the pipe early → SIGPIPE kills any tool before results appear.
+        # Replace ALL | head occurrences with | cat. execute_agent already trims long output.
+        script = re.sub(r"\|\s*head\b[^\n]*", "| cat", script)
+
+        # Safety: grep -P / grep -oP (Perl regex) silently produces empty output on Kali
+        # when \K lookahead is used — exit code 0, no stderr, but TOKEN is empty.
+        # The self-healing loop won't catch this (no shell error). Intercept here instead.
+        if re.search(r'\bgrep\s+["\']?-[a-zA-Z]*P', script):
+            print("[ExecuteAgent] grep -P/-oP detected — asking LLM to rewrite with POSIX grep...")
+            fix_prompt = (
+                "The bash script below uses 'grep -P' or 'grep -oP' (Perl regex) which silently "
+                "fails on Kali Linux — it produces empty output with exit code 0.\n"
+                "Replace ALL grep -P and grep -oP patterns with POSIX-compatible grep -o.\n"
+                "For _token extraction from HTML, use this exact pattern:\n"
+                "  TOKEN=$(echo \"$PAGE\" | tr \"'\" '\"' | grep -o 'name=\"_token\"[^>]*>' "
+                "| grep -o 'value=\"[^\"]*\"' | cut -d'\"' -f2 || true)\n"
+                "Output ONLY the corrected bash script, no explanation.\n\n"
+                f"Script:\n{script}"
+            )
+            fixed = self.llm._call(fix_prompt, phase="execute_fix")
+            script = _extract_script(fixed) or script
+            print("[ExecuteAgent] grep -P fix applied")
+
         print(f"[ExecuteAgent] Script:\n{script[:400]}")
+
+        # Pre-run cleanup: kill lingering sqlmap processes from previous turns.
+        # Runs as a SEPARATE call so the cleanup bash process's own cmdline does not
+        # contain the literal string /usr/bin/sqlmap — the [/] bracket trick prevents
+        # the awk pattern from matching its own cmdline, avoiding self-kill (exit -15).
+        cleanup_cmd = (
+            "MYPID=$$; "
+            "kill $(ps aux | awk -v m=$MYPID "
+            "'/[/]usr[/]bin[/]sqlmap/ && $2!=m {print $2}') "
+            "2>/dev/null; sleep 1; true"
+        )
+        try:
+            await self.kali.execute(cleanup_cmd)
+        except Exception:
+            pass  # cleanup failure is non-fatal
 
         # ── Execute on Kali — with self-healing retry ──────────────────────
         MAX_FIX_ATTEMPTS = 2

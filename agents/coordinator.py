@@ -115,7 +115,7 @@ class Coordinator:
                 response  = self.llm._call(prompt, phase="coordinator", json_mode=True)
                 reasoning = self._extract_reasoning(response)
                 print(f"[Coordinator] Reasoning:\n{reasoning}")
-    
+
                 # 4. Parse ACTION block
                 action = self._parse_action(response)
                 if action is None:
@@ -236,6 +236,14 @@ class Coordinator:
                         self.state.add_failed_approach(f"{task.description}: {note}"[:200])
                         print(f"[Tree] ✗ failed   {lbl} — {note[:60]}")
 
+                # If coordinator judged the previous execute turn as failed,
+                # save execute_evidence as a script lesson for future execute turns.
+                if action.get("execute_success") is False or action.get("execute_success") == "false":
+                    evidence = action.get("execute_evidence", "")
+                    if evidence and evidence != "null":
+                        self.state.add_script_lesson(f"Previous execute failed: {evidence}")
+                        print(f"[Lessons] recorded: {evidence[:80]}")
+
                 # Add new child tasks
                 for t in action.get("add_tasks", []):
                     parent = t.get("parent", "").strip()
@@ -340,12 +348,16 @@ class Coordinator:
     # ------------------------------------------------------------------
 
     def _parse_action(self, text: str) -> Optional[dict]:
-        try:
-            data = json.loads(text)
-            if isinstance(data, dict) and "agent" in data:
-                return data
-        except json.JSONDecodeError:
-            pass
+        # Strip markdown code fences if LLM wrapped the JSON
+        stripped = re.sub(r"^```(?:json)?\s*\n?", "", text.strip(), flags=re.IGNORECASE)
+        stripped = re.sub(r"\n?```\s*$", "", stripped.strip())
+        for candidate in (stripped, text.strip()):
+            try:
+                data = json.loads(candidate)
+                if isinstance(data, dict) and "agent" in data:
+                    return data
+            except json.JSONDecodeError:
+                pass
         print(f"[Coordinator] JSON parse failed — raw:\n{text[:300]}")
         return None
 
@@ -362,6 +374,10 @@ class Coordinator:
         lines = []
         for f in self.state.findings[-5:]:
             lines.append(f"{f.type}: {f.value} ({f.confidence}) — {f.evidence}")
+        if self.state.script_lessons:
+            lines.append("\nSCRIPT LESSONS — previous attempts failed with these patterns. DO NOT repeat them:")
+            for lesson in self.state.script_lessons:
+                lines.append(f"  - {lesson}")
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
@@ -433,21 +449,10 @@ class Coordinator:
             self.state.add_failed_approach(d)
 
     def _ingest_execute(self, result: ExecuteResult) -> None:
-        if result.success:
-            # Signal that an authenticated session is now active —
-            # coordinator will see raw output and decide next steps
-            login_keywords = ("welcome", "logout", "logged in", "dashboard", "admin")
-            if any(w in result.output_summary.lower() for w in login_keywords):
-                self.state.add_finding(
-                    type="authenticated",
-                    value="Active session established — cookie saved to /tmp/plante_session.txt",
-                    confidence="high",
-                    evidence=result.output_summary,
-                    verified=True,
-                )
-
-        if not result.success and result.output_summary:
-            self.state.add_failed_approach(result.output_summary[:200])
+        # NOTE: result.success is always False (execute_agent defers success judgment to coordinator).
+        # failed_approaches are populated by the coordinator's explicit fail_tasks JSON output.
+        # Do NOT auto-add output_summary here — it pollutes failed_approaches with successful steps.
+        pass
 
     # ------------------------------------------------------------------
     # Format results for __LAST_RESULT__ in next prompt

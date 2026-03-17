@@ -19,7 +19,8 @@ _bm25:     Optional[BM25Okapi]  = None
 
 
 def _tokenize(text: str) -> list[str]:
-    return [t for t in re.split(r"\W+", text.lower()) if len(t) > 2]
+    # Keep 2-char terms — critical pentest acronyms: rce, id, os, xss, lfi, sqli
+    return [t for t in re.split(r"\W+", text.lower()) if len(t) > 1]
 
 
 def _build_index() -> None:
@@ -44,8 +45,8 @@ def _build_index() -> None:
             header = re.sub(r"^#+\s*", "", lines[0]).strip()
             if header.lower() in _SKIP_HEADERS:
                 continue
-            # Keep up to 800 chars of content (enough for key payloads)
-            content = "\n".join(lines[:60])[:800]
+            # Keep up to 1500 chars of content — PATT payload lists need more room
+            content = "\n".join(lines[:80])[:1500]
             if len(content) < 40:          # skip near-empty sections
                 continue
             chunks.append(f"{category} {header} {content}")

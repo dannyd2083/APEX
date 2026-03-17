@@ -105,7 +105,7 @@ class RunLogger:
 
     def _write_md_header(self, name: str, url: str, goal: str) -> None:
         started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(self.md_path, "w", encoding="utf-8") as f:
+        with open(self.md_path, "a", encoding="utf-8") as f:
             f.write(f"# PLANTE v2 Run — {name}\n\n")
             f.write(f"**Target**: {url}  \n")
             f.write(f"**Goal**: {goal}  \n")

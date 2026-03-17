@@ -98,7 +98,7 @@ class KaliMCP:
     async def gobuster_scan(self, url: str) -> str:
         return await self._call_mcp_tool("gobuster_scan", {
             "url": url, "mode": "dir",
-            "wordlist": "/usr/share/wordlists/dirb/big.txt",
+            "wordlist": "/usr/share/wordlists/dirb/common.txt",
             "additional_args": "",
         })
 

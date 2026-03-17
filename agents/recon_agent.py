@@ -192,6 +192,23 @@ class ReconAgent:
         if not script:
             return "(no script)", "ERROR: LLM produced no script"
 
+        # Safety: | head closes pipe early → SIGPIPE kills tool before results appear.
+        script = re.sub(r"\|\s*head\b[^\n]*", "| cat", script)
+
+        # Safety: grep -P / grep -oP silently produces empty output on Kali.
+        if re.search(r'\bgrep\s+["\']?-[a-zA-Z]*P', script):
+            print("[ReconAgent] grep -P/-oP detected — asking LLM to rewrite with POSIX grep...")
+            fix_prompt = (
+                "The bash script below uses 'grep -P' or 'grep -oP' (Perl regex) which silently "
+                "fails on Kali Linux — it produces empty output with exit code 0.\n"
+                "Replace ALL grep -P and grep -oP patterns with POSIX-compatible grep -o.\n"
+                "Output ONLY the corrected bash script, no explanation.\n\n"
+                f"Script:\n{script}"
+            )
+            fixed = self.llm._call(fix_prompt, phase="recon_fix")
+            script = _extract_script(fixed) or script
+            print("[ReconAgent] grep -P fix applied")
+
         print(f"[ReconAgent] Script:\n{script[:400]}")
 
         MAX_FIX_ATTEMPTS = 2

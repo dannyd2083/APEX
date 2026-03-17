@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Default configuration
 DEFAULT_KALI_SERVER = "http://localhost:5000" # change to your linux IP
-DEFAULT_REQUEST_TIMEOUT = 900  # 15 minutes default timeout for API requests
+DEFAULT_REQUEST_TIMEOUT = 3660  # 61 minutes — 60s buffer over server's 3600s COMMAND_TIMEOUT
 
 class KaliToolsClient:
     """Client for communicating with the Kali Linux Tools API Server"""
@@ -145,7 +145,7 @@ def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
         """
         port_arg = f"-p {ports}" if ports else "--top-ports 1000"
         scripts  = "--script vuln,http-enum,http-title,http-auth-finder,http-headers"
-        cmd = f"nmap {scan_type} {port_arg} {scripts} {target}"
+        cmd = f"sudo nmap {scan_type} {port_arg} {scripts} {target}"
         if additional_args:
             cmd += f" {additional_args}"
         return kali_client.execute_command(cmd)
@@ -259,7 +259,7 @@ def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
             f"fi ; "
         )
         cmd  = (
-            f"rm -rf {out} {log} ; "
+            f"sudo rm -rf {out} {log} ; "
             f"{hosts_inject}"
             f"unbuffer sudo autorecon {target} --output {out} --only-scans-dir --exclude-tags long "
             f"  > {log} 2>&1 ; "
