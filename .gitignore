@@ -50,8 +50,21 @@ docs/*.blg
 *.log
 /tmp/
 
-# Results (optional - uncomment to ignore result files)
-# results/*.json
+# Results — local test output, not committed
+results/
+
+# Claude Code project memory
+.claude/
+
+# Session-specific files
+HOW_TO_RESUME.txt
+
+# MCP-Kali-Server is a separate upstream repo
+MCP-Kali-Server/
+
+# SSH keys
+*kali_key
+*kali_key.pub
 
 # Test files
 test.py

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 from agents.config.settings import project_root, TESTER_NAME
 from langchain_core.messages import BaseMessage
@@ -9,6 +10,8 @@ ATTACK_CHAIN_FILE_NAME = "attack_chain_output"
 EXECUTION_FILE_NAME = "execution_output"
 REMEDIATION_FILE_NAME = "remediation_output"
 EXECUTION_FIX_FILE_NAME = "execution_fix_output"
+CLASSIFICATION_FILE_NAME = "classification_output"
+TOKEN_USAGE_FILE_NAME = "token_usage"
 
 def load_attack_chain_json(file_path: str):
     if not os.path.exists(file_path):
@@ -21,6 +24,25 @@ def load_attack_chain_json(file_path: str):
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse attack chain JSON: {e}")
 
+def strip_markdown_code_blocks(text):
+    """Strip markdown code blocks from text."""
+    # Match ```json ... ``` or ``` ... ``` (case-insensitive language tag)
+    pattern = r'```(?:json|JSON)?\s*([\s\S]*?)\s*```'
+    match = re.search(pattern, text)
+    if match:
+        return match.group(1).strip()
+    return text
+
+def fix_invalid_json_escapes(text):
+    """Fix bash/shell escape sequences that are invalid in JSON.
+
+    LLMs often generate shell commands with escapes like \\$ and \\' which are
+    valid in bash but not in JSON. JSON only allows: \\" \\\\ \\/ \\b \\f \\n \\r \\t \\uXXXX.
+    This converts invalid escapes (e.g. \\$ -> \\\\$) so json.loads() can parse them.
+    """
+    # Replace \X where X is not a valid JSON escape character with \\X
+    return re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)
+
 def extract_json_from_llm_response(response):
     """
     Converts LLM output (which may be LangChain messages, Pydantic objects,
@@ -31,17 +53,27 @@ def extract_json_from_llm_response(response):
         for msg in response:
             if msg.__class__.__name__ == "AIMessage":
                 try:
-                    return json.loads(msg.content)
-                except:
-                    return {"raw_output": msg.content}
+                    cleaned = strip_markdown_code_blocks(msg.content)
+                    return json.loads(cleaned)
+                except json.JSONDecodeError:
+                    try:
+                        fixed = fix_invalid_json_escapes(cleaned)
+                        return json.loads(fixed)
+                    except:
+                        return {"raw_output": msg.content}
         return {"error": "No AIMessage in response"}
 
     # Case 2: Response is a BaseMessage
     if isinstance(response, BaseMessage):
         try:
-            return json.loads(response.content)
-        except:
-            return {"raw_output": response.content}
+            cleaned = strip_markdown_code_blocks(response.content)
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            try:
+                fixed = fix_invalid_json_escapes(cleaned)
+                return json.loads(fixed)
+            except:
+                return {"raw_output": response.content}
 
     # Case 3: Response is already a dict
     if isinstance(response, dict):
@@ -50,9 +82,14 @@ def extract_json_from_llm_response(response):
     # Case 4: Response is a JSON string
     if isinstance(response, str):
         try:
-            return json.loads(response)
-        except:
-            return {"raw_output": response}
+            cleaned = strip_markdown_code_blocks(response)
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            try:
+                fixed = fix_invalid_json_escapes(cleaned)
+                return json.loads(fixed)
+            except:
+                return {"raw_output": response}
 
     return {"raw_output": str(response)}
 
@@ -79,9 +116,13 @@ def make_json_safe(obj):
 class SaveResults:
     FOLDER_PATH = project_root / RESULTS_FOLDER
 
-    def __post_init__(self):
+    def __init__(self):
+        self.target_name = None
         self.FOLDER_PATH.mkdir(parents=True, exist_ok=True)
-    
+
+    def set_target_name(self, name):
+        self.target_name = name
+
     def _get_file_by_type(self, type):
         if type == "ac":
             return ATTACK_CHAIN_FILE_NAME
@@ -91,12 +132,15 @@ class SaveResults:
             return REMEDIATION_FILE_NAME
         elif type == "exec_fix":
             return EXECUTION_FIX_FILE_NAME
+        elif type == "classification":
+            return CLASSIFICATION_FILE_NAME
         return "unknown_output"
 
     def save_json_results(self, type: str, init_time: datetime, content: str):
         # Replace colons with dashes for Windows compatibility
         safe_time = str(init_time).replace(":", "-")
-        filename = f"{self._get_file_by_type(type)}_{TESTER_NAME}_{safe_time}.json"
+        target = f"_{self.target_name}" if self.target_name else ""
+        filename = f"{self._get_file_by_type(type)}{target}_{TESTER_NAME}_{safe_time}.json"
         full_file_path = self.FOLDER_PATH / filename
 
         safe_exec = make_json_safe(content)

@@ -1,0 +1,173 @@
+==================================================
+PLANTE v2 — HOW TO RUN
+==================================================
+
+
+==================== HTB BOX ====================
+
+STEP 1: Start Kali VM
+--------------------------------------------------
+In PowerShell:
+  & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" startvm "kali-linux-2025.4-virtualbox-amd64" --type headless
+
+Wait ~30 seconds for Kali to boot.
+
+
+STEP 2: Start MCP + ZAP + VPN on Kali
+--------------------------------------------------
+SSH into Kali (password: kali):
+  ssh kali@192.168.56.101
+
+Run all commands below in order:
+
+  # 1. Start MCP server
+  cd /home/kali/MCP-Kali-Server && source venv/bin/activate
+  nohup python3 kali_api_server.py --ip 0.0.0.0 > /dev/null 2>&1 &
+  sleep 3
+
+  # 2. Start ZAP daemon (REQUIRED — recon uses zap-cli)
+  zaproxy -daemon -port 8080 -host 127.0.0.1 -config api.disablekey=true > /dev/null 2>&1 &
+  sleep 20
+
+  # 3. Verify ZAP is running
+  zap-cli --port 8080 status
+  # Must print: ZAP is running
+
+  # 4. Start VPN
+  sudo openvpn --config /home/kali/machines_us-dedivip-1.ovpn --daemon
+  sleep 15
+
+  # 5. Verify VPN connected
+  ip addr show tun0 | grep inet
+  # Must show a 10.x.x.x IP
+
+NOTE: VPN file is machines_us-dedivip-1.ovpn (NOT lab_dengzc.ovpn — does not exist)
+Alternative VPN: /home/kali/htb-tcp.ovpn
+Starting Point VPN: /home/kali/starting_points_us-starting-point-vip-1-dhcp.ovpn
+
+If port 5000 already in use (MCP fails):
+  sudo kill -9 $(sudo lsof -t -i :5000) && nohup python3 kali_api_server.py --ip 0.0.0.0 > /dev/null 2>&1 &
+
+If ZAP is already running from a previous session (zap-cli status shows running), skip step 2.
+
+
+VERIFY EVERYTHING IS RUNNING (run before starting PLANTE):
+--------------------------------------------------
+  # MCP server
+  curl -s http://localhost:5000/health | python3 -c "import sys,json; d=json.load(sys.stdin); print('MCP:', d.get('status','?'))"
+
+  # ZAP daemon
+  zap-cli --port 8080 status
+  # Expected: ZAP is running
+
+  # VPN
+  ip addr show tun0 | grep inet
+  # Expected: inet 10.x.x.x
+
+All three must be green before running PLANTE.
+
+
+STEP 3: Spawn HTB box
+--------------------------------------------------
+- Go to https://app.hackthebox.com
+- Find the box (e.g. Appointment)
+- Click "Spawn Machine"
+- Wait for IP to appear (e.g. 10.129.x.x)
+- Note the IP
+
+
+STEP 4: Activate Python environment
+--------------------------------------------------
+In PowerShell:
+  cd C:\Users\danny\Desktop\Projects\PLANTE
+  .\venv\Scripts\Activate.ps1
+
+
+STEP 5: Run PLANTE v2 against HTB box
+--------------------------------------------------
+Replace <IP> and <BoxName> with actual values.
+
+For SQLi boxes (Appointment, GoodGames, Writeup):
+  python -m agents.coordinator `
+    --target-url http://<IP>/ `
+    --target-name <BoxName> `
+    --max-turns 15 `
+    --goal "get OS command execution or extract sensitive data — find and exploit SQL injection on login forms or input fields. Try auth bypass via SQLi first (' OR '1'='1'-- etc), then credential extraction. Success = login bypass or dumping credentials/data."
+
+For RCE/upload boxes (Networked, OpenAdmin):
+  python -m agents.coordinator `
+    --target-url http://<IP>/ `
+    --target-name <BoxName> `
+    --max-turns 15 `
+    --goal "get OS command execution on the target — enumerate the web app, find file upload or known CVE, exploit it to run system commands. Success = running whoami or id and seeing the output."
+
+
+STEP 6: View the run log
+--------------------------------------------------
+Results saved to:
+  C:\Users\danny\Desktop\Projects\PLANTE\results\v2\<BoxName>_<timestamp>\
+
+Files:
+  run.md   — full turn-by-turn log (scripts, outputs, coordinator reasoning)
+  run.json — structured data (goal_achieved, evidence, cost, turns)
+
+
+STEP 7: Stop HTB box + shut down
+--------------------------------------------------
+1. Stop machine on HTB website
+2. On Kali terminal — kill all services:
+     pkill -f kali_api_server.py
+     sudo pkill -f openvpn
+     pkill -f zaproxy
+     kill %1 %2 %3 2>/dev/null   # clear any suspended background jobs
+     exit
+3. Power off VM from PowerShell:
+     & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" controlvm "kali-linux-2025.4-virtualbox-amd64" poweroff
+
+
+==================== DVWA (local) ====================
+
+STEP 1: Start Kali VM
+--------------------------------------------------
+  & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" startvm "kali-linux-2025.4-virtualbox-amd64" --type headless
+
+
+STEP 2: Start DVWA + ZAP + MCP
+--------------------------------------------------
+  ssh kali "bash ~/start_plante.sh"
+
+Wait for:
+  DVWA  : 200
+  MCP   : 200
+  ZAP   : 200
+
+
+STEP 3: Verify DVWA security level is LOW
+--------------------------------------------------
+Open browser: http://192.168.56.101:42001
+Login: admin / password
+Left menu → DVWA Security → confirm "low"
+If not low, set it to low and click Submit.
+
+
+STEP 4: Activate Python environment
+--------------------------------------------------
+  cd C:\Users\danny\Desktop\Projects\PLANTE
+  .\venv\Scripts\Activate.ps1
+
+
+STEP 5: Run PLANTE v2
+--------------------------------------------------
+  python -m agents.coordinator `
+    --target-url http://192.168.56.101:42001 `
+    --target-name DVWA `
+    --max-turns 15 `
+    --goal "get OS command execution on the target — log in with default credentials first (admin/password), then find and exploit RCE via command injection, file upload, or file inclusion. Success = running whoami or id and seeing the output."
+
+
+STEP 6: Shut down
+--------------------------------------------------
+  ssh kali "echo kali | sudo -S killall python3 2>/dev/null; echo kali | sudo -S poweroff"
+  & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" controlvm "kali-linux-2025.4-virtualbox-amd64" poweroff
+
+==================================================

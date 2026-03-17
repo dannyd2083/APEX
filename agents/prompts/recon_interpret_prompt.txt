@@ -1,0 +1,29 @@
+Recon objective: __OBJECTIVE__
+
+Command output:
+__OUTPUT__
+
+Extract all useful findings from the output above.
+
+Rules:
+- If the output is HTML, extract EVERY href and form action as a finding — these are real links
+  in the page source and must NOT be filtered out or second-guessed.
+- Always report the exact full path as found — never collapse /a/b/c to /a/ or /a/b/.
+- For scanner output (nikto, sqlmap), only report paths/issues that have clear evidence in the output.
+
+Output ONLY this JSON:
+
+{
+  "findings": [
+    {
+      "type": "<service|directory|auth|vulnerability|credential|parameter>",
+      "value": "<what was found>",
+      "confidence": "<high|medium|low>",
+      "evidence": "<which command or output showed this>"
+    }
+  ],
+  "dead_ends": ["<thing tried that returned nothing useful>"],
+  "raw_summary": "<2-3 sentence summary of what was found>"
+}
+
+Output only the JSON. No explanation before or after it.

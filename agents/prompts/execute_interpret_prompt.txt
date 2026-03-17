@@ -1,0 +1,13 @@
+Task that was run: __TASK__
+
+Command output:
+__OUTPUT__
+
+Write a single sentence summarising what happened — what the server returned or what the command produced.
+Do NOT judge success or failure. Do NOT decide what is important. Just describe what occurred.
+
+Output ONLY this JSON:
+
+{
+  "output_summary": "<one sentence — what happened>"
+}
