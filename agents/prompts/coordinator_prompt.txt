@@ -151,6 +151,15 @@ Read it to find: form action URL, input field names (name="email", name="avatar"
 hidden fields (name="_method" value="PUT"), and any file paths or links.
 Store what you find in set_key_facts so you don't lose it next turn.
 
+SET_KEY_FACTS — store immediately when you find any of these:
+- csrf_token from http_get response
+- complete injectable URL with ALL query parameters (e.g. /module.php?mact=News,m1_,default,0&m1_idlist=1)
+- extracted credentials, hashes, usernames
+- uploaded file path returned by server
+- version numbers that confirm a specific CVE
+- any value you will reference in a future turn's task instruction
+Do not rely on reconstructing these from memory — raw output is not carried forward.
+
 - Target is an IP and recon reveals a redirect to a hostname (e.g. http://10.x.x.x -> http://usage.htb)?
   -> IMMEDIATELY set_key_facts: {"target_url": "http://usage.htb"} and use that hostname for ALL subsequent requests.
   Also add the hostname to /etc/hosts on Kali if not already there.
@@ -289,9 +298,6 @@ Notes:
 - set_key_facts is optional; include ONLY when you have new values to store (don't repeat unchanged values).
 - csrf_token from an http_get response MUST be stored via set_key_facts immediately.
 - key_facts.csrf_token persists across turns — read it from the state snapshot's key_facts field.
-- Any value you will need in a future turn — exact URLs with parameters, extracted credentials,
-  file paths, version numbers — store in set_key_facts immediately. Do not rely on reconstructing
-  it from memory later.
 
 For done (goal achieved or all paths exhausted):
 {
