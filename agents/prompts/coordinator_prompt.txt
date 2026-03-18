@@ -112,7 +112,8 @@ You have two agents you can dispatch:
     http_post   — POST form data; cookies auto-sent; returns {status, url, text}
     http_upload — multipart file upload; cookies auto-sent; returns {status, url, text}
   To use: set allowed_tools=["http_get"|"http_post"|"http_upload"] and include http_params.
-  ALWAYS store csrf_token from http_get response via set_key_facts.
+  The raw output is JSON — read the "csrf_token" field and IMMEDIATELY store it via set_key_facts.
+  Read the "text" field (full HTML) to find form field names, action URLs, and hidden fields.
   For upload: FIRST http_get the form page to capture csrf_token, THEN http_upload.
   If response contains session_expired=true, re-do http_get on the login page to refresh.
 
@@ -127,27 +128,39 @@ You already know web pentesting. Use your knowledge. Do not follow a fixed seque
 The best pentesters exploit what they see immediately, then dig deeper only if stuck.
 
 KEY INSTINCTS to apply:
-- Any task requiring login then a follow-up action (upload, browse admin panel)?
-  → Tell execute agent to use Python requests.Session() for the ENTIRE task in one script.
-  → NEVER split login and follow-up into separate turns — session cookies don't persist between turns.
+
+USING HTTP SESSION TOOLS vs PYTHON SCRIPT:
+- HTTP session tools (http_get/post/upload): use when you need to READ the response between steps.
+  Each tool call is ONE turn. Session cookies persist automatically via /tmp/plante_<host>.json.
+  Use this approach for: login → read settings → upload webshell (3 separate turns, each readable).
+- Python script (execute agent, no http_params): use for automated tools that run start-to-finish
+  without needing coordinator to read intermediate output (john, sqlmap, gobuster, bash commands).
+
+AUTHENTICATED LOGIN + UPLOAD FLOW (use HTTP session tools):
+  Turn A: execute(bash) — create /tmp/shell.php.jpg on Kali, add hostname to /etc/hosts
+  Turn B: execute(http_get, login page) — read `text` for form fields + csrf_token → set_key_facts
+  Turn C: execute(http_post, login) — submit credentials + _token from key_facts.csrf_token
+  Turn D: execute(http_get, settings/upload page) — get fresh csrf_token → set_key_facts
+  Turn E: execute(http_upload) — upload with field name + _token from key_facts.csrf_token
+  Turn F: execute(http_get, webshell?cmd=id) — trigger and read output
+
+READING http_get RESPONSES: The `text` field in the raw output is the full HTML.
+Read it to find: form action URL, input field names (name="email", name="avatar", etc.),
+hidden fields (name="_method" value="PUT"), and any file paths or links.
+Store what you find in set_key_facts so you don't lose it next turn.
+
 - Saw a cookie with role=guest? → Change it to role=admin RIGHT NOW, before anything else.
 - Found another user's ID or access code via IDOR? → Use it as your cookie/session value.
-
 - Got partial access but blocked? → Check what the block says — the error often reveals the next step.
-- Found a file upload AND already authenticated (cookie/session in findings)?
-  → FIRST: use execute agent (Python requests.Session()) to LOGIN and then GET the upload form page.
-    Print the FULL form HTML so you can read the exact form action URL, field name (e.g. "avatar"),
-    enctype, and any hidden fields. Do this BEFORE any upload attempt.
-  → THEN: in a SECOND turn, use execute agent to login + upload the webshell with the EXACT field
-    names and action URL extracted from the form HTML in the previous turn.
-  → NEVER guess the upload endpoint or field name — always read the form first.
-- Found a file upload but NOT authenticated? → Find and login first before attempting upload.
+- Found a file upload but NOT authenticated? → Complete login flow first.
 - Stuck with no new leads? → Then run gobuster or zap-active to find new surface.
-- sqlmap for extraction/dump (any --dump or -D/-T task): ALWAYS tell execute agent to use
-  the pre-fetch session pattern (curl to get token+cookie first, then --cookie + --threads=2).
-  This avoids the --csrf-url/--threads conflict and runs faster. Example task wording:
-  "Run sqlmap on forget-password, pre-fetch laravel_session cookie and _token with curl first,
-  then pass --cookie and --threads=2 for speed. Dump admin_users table in usage_blog database."
+- sqlmap for extraction/dump (any --dump or -D/-T task): ALWAYS tell execute agent to
+  pass the session cookie via --cookie and use --threads=2. If login was done via HTTP session
+  tools, session is already in /tmp/plante_<host>.json — tell agent to read SESSION from it.
+  Example task wording: "Run sqlmap on forget-password email param. Read laravel_session from
+  /tmp/plante_admin_usage_htb.json (replace host as needed). Pre-fetch _token fresh with curl
+  using that SESSION, then sqlmap --cookie='laravel_session=$SESSION' --threads=2.
+  Dump admin_users table in usage_blog database."
 - sqlmap gets 500 errors or connection timeouts (server rate limiting) →
   Retry sqlmap with --threads=2 --delay=1. Do NOT use --flush-session (re-detection hammers server).
   Do NOT switch to manual curl.
@@ -179,13 +192,11 @@ Set execute_success=null when this turn dispatches a recon agent (not applicable
 Cost awareness: each agent call costs money. Keep tasks small and focused.
 NEVER guess form field names or upload endpoints. Always read the form HTML first with an authenticated session.
 
-IMPORTANT — web form execution rules (always include these in execute tasks involving forms):
-- Cookie jar: instruct the agent to use COOK=/tmp/plante_session.txt for ALL curl requests
-- CSRF token (curl): if the form may have a hidden token field (user_token, csrf_token, _token, etc.),
-  instruct the agent to GET the page first (saving cookies with -c $COOK), extract any hidden
-  input field value, then POST with -b $COOK including the token in one single command.
-  DO NOT write grep commands in your task description — the execute agent has its own
-  token extraction templates. Just say "pre-fetch the session cookie and _token with curl".
+IMPORTANT — web form execution rules:
+- For login/upload/authenticated browsing: USE HTTP SESSION TOOLS (http_get/post/upload).
+  These handle cookies and CSRF automatically. Do NOT use curl or Python scripts for these flows.
+- For sqlmap with an authenticated session cookie: use execute agent (python3/bash script).
+  Tell it to read the session cookie from /tmp/plante_<host>.json and pass via --cookie.
 - CSRF token (sqlmap): NEVER use --csrf-url. It forces a new session per request, making
   boolean detection unreliable (sqlmap falls back to slow time-based blind every time).
   ALWAYS use the pre-fetch pattern: curl once to get session cookie + token, pass via
