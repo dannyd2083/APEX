@@ -134,8 +134,8 @@ class ReconAgent:
         elif tool == "sqlmap":
             return await self.kali.sqlmap(target_url)
         elif tool == "sleep":
-            await self.kali.execute("sleep 120")
-            return "[exit code: 0]\n[stdout]\nSlept 120 seconds to allow rate-limit/fail2ban cooldown."
+            await self.kali.execute("sleep 180")
+            return "[exit code: 0]\n[stdout]\nSlept 180 seconds to allow rate-limit/fail2ban cooldown."
         elif tool == "autorecon":
             parsed = urlparse(target_url)
             target = parsed.hostname or target_url

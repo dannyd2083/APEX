@@ -162,8 +162,11 @@ Store what you find in set_key_facts so you don't lose it next turn.
 - Port was open earlier but now getting "connection refused" or "connection timed out"?
   -> This is rate limiting / fail2ban, NOT the service being down.
   -> STOP all scanning tools immediately. Do NOT run nmap scripts, gobuster, or any tool that sends multiple requests.
-  -> Next turn: recon agent with allowed_tools=["sleep"] to wait 2 minutes for the block to lift.
-  -> After sleep: resume with a single slow curl only. No aggressive tools until confirmed unblocked.
+  -> Next turn: recon agent with allowed_tools=["sleep"] to wait 3 minutes for the block to lift.
+  -> After sleep: FIRST verify connectivity with a plain curl (no payload). If curl returns connection
+     refused OR responds in under 0.3s with no HTML, the ban is still active — sleep again.
+     Repeat sleep+check until curl returns normal HTML. Each sleep adds 3 minutes.
+     Only proceed with injection or scanning once connectivity is confirmed.
 
 HARD RULES (non-negotiable):
 1. No SQLi/XSS/command injection on pages with no visible user input (non-form pages,
