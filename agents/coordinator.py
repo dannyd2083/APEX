@@ -71,11 +71,20 @@ class Coordinator:
         last_result = "No actions taken yet."
         _run_error  = None
         _gave_up    = False
+        _cleaned    = False
 
         while True:
           # Open both KaliMCP subprocesses — reopened on each extension iteration.
           # Use async with so anyio cancel scopes are always closed in the same task.
           async with self.recon.kali, self.execute.kali:
+            # Delete stale session files from any previous run (once per outer loop)
+            if not _cleaned:
+                try:
+                    await self.execute.kali.execute("rm -f /tmp/plante_*.json")
+                    print("[Coordinator] Cleaned /tmp/plante_*.json")
+                except Exception:
+                    pass
+                _cleaned = True
             try:
               while not self.state.stop_reason():
                 turn = self.state.total_turns + 1
@@ -164,6 +173,7 @@ class Coordinator:
                         task=action["task"],
                         allowed_tools=action.get("allowed_tools"),
                         context=self._context_for_execute(),
+                        http_params=action.get("http_params"),
                     )
                     last_result       = self._format_execute(result)
                     agent_result_text = last_result
@@ -254,6 +264,11 @@ class Coordinator:
                             print(f"[Tree] + added    {new_task.label} under {parent} — {desc[:60]}")
                         except KeyError as e:
                             print(f"[Tree] ! bad parent '{parent}': {e}")
+
+                # Store persistent discoveries in key_facts
+                if action.get("set_key_facts"):
+                    self.state.set_key_facts(action["set_key_facts"])
+                    print(f"[KeyFacts] updated: {list(action['set_key_facts'].keys())}")
 
                 # Update RAG query for next turn
                 if action.get("rag_query"):
@@ -374,6 +389,10 @@ class Coordinator:
         lines = []
         for f in self.state.findings[-5:]:
             lines.append(f"{f.type}: {f.value} ({f.confidence}) — {f.evidence}")
+        if self.state.key_facts:
+            lines.append("\nKEY FACTS (persistent discoveries):")
+            for k, v in self.state.key_facts.items():
+                lines.append(f"  {k}: {v}")
         if self.state.script_lessons:
             lines.append("\nSCRIPT LESSONS — previous attempts failed with these patterns. DO NOT repeat them:")
             for lesson in self.state.script_lessons:

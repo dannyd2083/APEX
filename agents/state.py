@@ -70,6 +70,7 @@ class PentestState:
     failed_approaches: list = field(default_factory=list)   # strings, redundancy gate checks this
     action_history:    list = field(default_factory=list)   # agent types with result summaries
     script_lessons:    list = field(default_factory=list)   # script-level failure patterns to avoid
+    key_facts:         dict = field(default_factory=dict)   # persistent discoveries: creds, URLs, field names
 
     total_cost_usd: float = 0.0
     total_turns:    int   = 0
@@ -149,6 +150,12 @@ class PentestState:
 
     def record_action(self, entry: str) -> None:
         self.action_history.append(entry)
+
+    def set_key_facts(self, updates: dict) -> None:
+        """Store persistent discoveries. Never overwrite existing value with empty string."""
+        for k, v in updates.items():
+            if v and str(v).strip():
+                self.key_facts[k] = v
 
     def add_script_lesson(self, lesson: str) -> None:
         """Record a script-level failure pattern so execute agent avoids it next time."""
@@ -274,6 +281,7 @@ class PentestState:
             "target_os":     self.target_os,
             "goal":          self.goal,
             "goal_achieved": self.goal_achieved,
+            "key_facts":     self.key_facts,
 
             "pentest_task_tree": self.task_tree_snapshot(),
 

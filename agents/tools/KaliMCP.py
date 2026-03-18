@@ -1,5 +1,8 @@
+import asyncio
 import sys
 import json
+
+import requests as _req
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -123,3 +126,35 @@ class KaliMCP:
             "url": "", "mode": "alerts", "port": port,
         })
         return scan_out + "\n\n[ZAP ALERTS]\n" + alerts_out
+
+    # ------------------------------------------------------------------
+    # HTTP session tools — call Kali REST API directly (no MCP wrapper)
+    # Kali maintains a persistent cookie jar at /tmp/plante_<host>.json
+    # ------------------------------------------------------------------
+
+    async def _call_kali_http(self, path: str, payload: dict) -> str:
+        url = f"http://{ip_settings.KALI_IP}:5000{path}"
+        def _do() -> str:
+            try:
+                r = _req.post(url, json=payload, timeout=60)
+                return r.text
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+        return await asyncio.to_thread(_do)
+
+    async def http_get(self, url: str) -> str:
+        return await self._call_kali_http("/api/http/get", {"url": url})
+
+    async def http_post(self, url: str, data: dict,
+                        headers: dict | None = None) -> str:
+        return await self._call_kali_http("/api/http/post", {
+            "url": url, "data": data, "headers": headers or {},
+        })
+
+    async def http_upload(self, url: str, field: str, filepath: str,
+                          data: dict | None = None,
+                          mime: str = "image/jpeg") -> str:
+        return await self._call_kali_http("/api/http/upload", {
+            "url": url, "field": field, "filepath": filepath,
+            "data": data or {}, "mime": mime,
+        })

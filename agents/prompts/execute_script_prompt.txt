@@ -150,6 +150,15 @@ Example (authenticated session, no CSRF token):
            --cookie="laravel_session=$SESSION" \
            --flush-session --batch --level=2 | cat
 
+If the session was created by the Plan B HTTP session tools (http_get/http_post/http_upload),
+the cookie is stored in a JSON file at /tmp/plante_<sanitized_hostname>.json.
+Read the session cookie from it like this:
+    HOST="admin_usage_htb"   # replace with sanitized hostname (dots/dashes → underscores)
+    SESSION=$(python3 -c "import json; print(json.load(open('/tmp/plante_${HOST}.json')).get('laravel_session',''))")
+    sqlmap -u "http://target/endpoint" --data "param=x" -p param \
+           --cookie="laravel_session=$SESSION" \
+           --batch --level=2 | cat
+
 SPEED — pre-fetch session to enable --threads (avoids --csrf-url conflict):
 --csrf-url is incompatible with --threads. To use multi-threading on a CSRF-protected form,
 pre-fetch the session cookie + token once, then pass them statically. Laravel CSRF tokens

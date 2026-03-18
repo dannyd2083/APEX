@@ -55,11 +55,19 @@ class ExecuteAgent:
         self.llm  = llm
         self.kali = KaliMCP()
 
+    _HTTP_TOOLS = {"http_get", "http_post", "http_upload"}
+
     async def run(self,
                   target_url: str,
                   task: str,
                   allowed_tools: Optional[list] = None,
-                  context: str = "") -> ExecuteResult:
+                  context: str = "",
+                  http_params: Optional[dict] = None) -> ExecuteResult:
+
+        # HTTP session tools — bypass LLM script generation entirely
+        if http_params and allowed_tools and allowed_tools[0] in self._HTTP_TOOLS:
+            return await self._run_http_tool(allowed_tools[0], http_params)
+
         tools_str   = ", ".join(allowed_tools) if allowed_tools else "curl, sqlmap, hydra, wfuzz, python3"
         context_str = f"Context from coordinator:\n{context}" if context else ""
 
@@ -162,6 +170,26 @@ class ExecuteAgent:
         result = self._parse(response, raw_output)
         result.script = script
         return result
+
+    async def _run_http_tool(self, tool: str, params: dict) -> ExecuteResult:
+        """Call an HTTP session tool on Kali directly — no script generation."""
+        print(f"[ExecuteAgent] HTTP tool: {tool} params={list(params.keys())}")
+        try:
+            if tool == "http_get":
+                raw = await self.kali.http_get(params["url"])
+            elif tool == "http_post":
+                raw = await self.kali.http_post(
+                    params["url"], params.get("data", {}), params.get("headers"))
+            elif tool == "http_upload":
+                raw = await self.kali.http_upload(
+                    params["url"], params["field"], params["filepath"],
+                    params.get("data", {}), params.get("mime", "image/jpeg"))
+            else:
+                return ExecuteResult(success=False, error=f"Unknown HTTP tool: {tool}")
+            print(f"[ExecuteAgent] HTTP result: {raw[:300]}")
+            return ExecuteResult(success=True, output_summary=raw[:300], raw_output=raw)
+        except Exception as e:
+            return ExecuteResult(success=False, error=str(e))
 
     def _parse(self, raw_text: str, raw_output: str = "") -> ExecuteResult:
         try:
