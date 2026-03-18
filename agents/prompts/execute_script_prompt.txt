@@ -9,9 +9,11 @@ KALI LINUX CONSTRAINTS — these apply to every script, no exceptions:
 - NEVER use set -e — grep returns exit 1 on no match, which kills the script
 - If writing Python, the script MUST start with: #!/usr/bin/env python3
   Without this shebang the shell will try to execute Python code as bash and fail.
-- If running an existing exploit script found via searchsploit (e.g. 46635.py) that uses
-  Python 2 syntax (print "..." without parentheses), run it with: python2 /path/to/script.py
-  Do NOT attempt to convert it with 2to3 — just use python2 directly.
+- For exploit-db scripts: use searchsploit to get the local copy — do NOT wget any URL.
+  The file is already on Kali's local exploit-db database:
+      searchsploit -m 46635        # copies 46635.py to current directory
+      python2 ./46635.py [args]    # always run with python2, never python3
+  Do NOT convert the script. Do NOT use sed on it. Do NOT add a shebang. Just python2.
 
 Target : __TARGET_URL__
 Task   : __TASK__
@@ -29,6 +31,9 @@ Python stdlib (always available, NEVER pip install): os, sys, time, subprocess, 
 If you need a third-party library not in the list above, install it BEFORE importing it:
     import subprocess; subprocess.run(["pip","install","--break-system-packages","-q","libname"], check=False)
 NEVER pip install stdlib modules — they are built-in and pip will fail to find them.
+If a script fails with ImportError or ModuleNotFoundError, fix it by upgrading the broken package:
+    pip install --break-system-packages --upgrade <package_name>
+Then re-run the script in the same bash script (no separate call needed).
 
 The sections below are REFERENCE PATTERNS — templates to adapt, not rules to copy verbatim.
 Pick only what your task needs. Substitute real URLs, field names, and parameters from the task.
