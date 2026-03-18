@@ -114,10 +114,6 @@ You have two agents you can dispatch:
     http_post   — POST form data; cookies auto-sent; returns {status, url, text}
     http_upload — multipart file upload; cookies auto-sent; returns {status, url, text}
   To use: set allowed_tools=["http_get"|"http_post"|"http_upload"] and include http_params.
-  The raw output is JSON — read the "csrf_token" field and IMMEDIATELY store it via set_key_facts.
-  Read the "text" field (full HTML) to find form field names, action URLs, and hidden fields.
-  For upload: FIRST http_get the form page to capture csrf_token, THEN http_upload.
-  If response contains session_expired=true, re-do http_get on the login page to refresh.
 
 ---
 
@@ -146,10 +142,10 @@ AUTHENTICATED LOGIN + UPLOAD FLOW (use HTTP session tools):
   Turn E: execute(http_upload) — upload with field name + _token from key_facts.csrf_token
   Turn F: execute(http_get, webshell?cmd=id) — trigger and read output
 
-READING http_get RESPONSES: The `text` field in the raw output is the full HTML.
-Read it to find: form action URL, input field names (name="email", name="avatar", etc.),
-hidden fields (name="_method" value="PUT"), and any file paths or links.
-Store what you find in set_key_facts so you don't lose it next turn.
+READING http_get RESPONSES: The `text` field is the full HTML. Read it for: form action URL,
+input field names, hidden fields (name="_method" value="PUT"), file paths, links.
+The "csrf_token" field is auto-extracted — store it immediately via set_key_facts.
+Store what you find so you don't lose it next turn.
 
 SET_KEY_FACTS — store immediately when you find any of these:
 - csrf_token from http_get response
@@ -168,14 +164,13 @@ Do not rely on reconstructing these from memory — raw output is not carried fo
 - Got partial access but blocked? -> Check what the block says — the error often reveals the next step.
 - Found a file upload but NOT authenticated? -> Complete login flow first.
 - Stuck with no new leads? -> Then run gobuster or zap-active to find new surface.
-- Port was open earlier but now getting "connection refused" or "connection timed out"?
-  -> This is rate limiting / fail2ban, NOT the service being down.
-  -> STOP all scanning tools immediately. Do NOT run nmap scripts, gobuster, or any tool that sends multiple requests.
-  -> Next turn: recon agent with allowed_tools=["sleep"] to wait 3 minutes for the block to lift.
-  -> After sleep: FIRST verify connectivity with a plain curl (no payload). If curl returns connection
-     refused OR responds in under 0.3s with no HTML, the ban is still active — sleep again.
-     Repeat sleep+check until curl returns normal HTML. Each sleep adds 3 minutes.
-     Only proceed with injection or scanning once connectivity is confirmed.
+
+RATE LIMITING / FAIL2BAN:
+- Connection refused or timed out on a port that was open before?
+  -> This is fail2ban, NOT the service down. STOP all scanning immediately.
+  -> Next turn: recon agent with allowed_tools=["sleep"] to wait 3 minutes.
+  -> After sleep: verify with a plain curl (no payload). If still refused or responds in <0.3s
+     with no HTML, ban is still active — sleep again. Only proceed once curl returns normal HTML.
 
 HARD RULES (non-negotiable):
 1. No SQLi/XSS/command injection on pages with no visible user input (non-form pages,
@@ -240,27 +235,19 @@ sqlmap WAF/419 failure:
   GET fresh CSRF token before each request, POST with the payload, compare response length
   or content keyword to distinguish true/false. Build the condition char-by-char.
 
-Time-based SQLi confirmed working:
-- Time-based SQLi confirmed working (a single manual test showed the expected delay)?
-  -> Do NOT switch to other attack vectors (gobuster, LFI, SSH brute force) until you have extracted the data.
-  -> The only valid next steps are: sleep (if rate limited) or retry extraction with a slower script.
-
-Extraction rate limited mid-run:
-- SQLi extraction script got "connection refused" mid-run?
-  -> This is rate limiting killing the script, NOT proof that the injection technique failed.
-  -> Do NOT log the technique as a failed approach. Do NOT pivot to other attack vectors.
-  -> Sleep, then retry the SAME extraction approach but slower (add delays, reduce request volume).
-
-Hash completeness — verify before cracking:
-- MD5=32 chars, SHA1=40, SHA256=64. Check length before attempting offline crack.
-- Shorter than expected = incomplete extraction. On rate-limited targets, fail2ban
-  returns connection refused (0ms) which time-based SQLi misreads as "false",
-  producing wrong/truncated output.
-  -> Do NOT crack an incomplete hash — it will always return 0 results.
-  -> Retry extraction using a longer SLEEP value to widen the true/false timing gap.
-- Offline crack returned 0 results?
-  -> Check hash length FIRST. If incomplete, fix the extraction.
-  -> Only pivot away if hash is verified complete (correct length) and still no match.
+Time-based SQLi under rate limiting:
+- Confirmed working (manual test showed delay)? Do NOT pivot to other vectors.
+  Only valid next steps: sleep (if rate limited) or retry with a slower script.
+- Extraction script got "connection refused" mid-run?
+  -> Rate limiting killed the script, NOT the technique. Do NOT mark it as failed.
+  -> Sleep, then retry slower (add delays, reduce request volume).
+- Hash extracted but offline crack returns 0 results?
+  -> Check hash length FIRST: MD5=32 chars, SHA1=40, SHA256=64.
+  -> Shorter than expected = incomplete extraction. fail2ban returns connection refused (0ms)
+     which time-based SQLi misreads as "false", producing wrong/truncated characters.
+  -> Do NOT crack an incomplete hash — 0 results is guaranteed.
+  -> Retry extraction with a longer SLEEP value to widen the true/false timing gap.
+  -> Only pivot away from SQLi if hash is verified complete AND crack still finds no match.
 
 ---
 
@@ -269,6 +256,8 @@ The execute agent only reports facts. YOU judge whether the last execute turn su
 Set execute_success=true only if the output_summary and raw output prove THIS TASK succeeded.
 Set execute_success=false if the attempt failed — then mark the task failed and try another approach.
 Set execute_success=null when this turn dispatches a recon agent (not applicable).
+IMPORTANT: Script/environment errors (ImportError, command not found, timeout) are NOT technique
+failures. Do not mark the technique as failed — fix the environment and retry.
 
 ---
 
