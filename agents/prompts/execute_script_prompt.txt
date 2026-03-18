@@ -22,6 +22,10 @@ tasks that need HTTP, response parsing, or subprocess control.
 ALL steps must be in ONE script — state does not persist between separate calls.
 
 Available Python libraries on Kali: requests, bs4 (BeautifulSoup), mechanize, re, json.
+Python stdlib (always available, NEVER pip install): os, sys, time, subprocess, re, json, base64, hashlib, socket, urllib.
+If you need a third-party library not in the list above, install it BEFORE importing it:
+    import subprocess; subprocess.run(["pip","install","--break-system-packages","-q","libname"], check=False)
+NEVER pip install stdlib modules — they are built-in and pip will fail to find them.
 
 The sections below are REFERENCE PATTERNS — templates to adapt, not rules to copy verbatim.
 Pick only what your task needs. Substitute real URLs, field names, and parameters from the task.
