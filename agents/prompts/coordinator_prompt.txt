@@ -289,6 +289,9 @@ Notes:
 - set_key_facts is optional; include ONLY when you have new values to store (don't repeat unchanged values).
 - csrf_token from an http_get response MUST be stored via set_key_facts immediately.
 - key_facts.csrf_token persists across turns — read it from the state snapshot's key_facts field.
+- Any value you will need in a future turn — exact URLs with parameters, extracted credentials,
+  file paths, version numbers — store in set_key_facts immediately. Do not rely on reconstructing
+  it from memory later.
 
 For done (goal achieved or all paths exhausted):
 {
