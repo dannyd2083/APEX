@@ -177,9 +177,9 @@ class PentestState:
 
         STATUS_ICON = {
             "pending":     "[ ]",
-            "in_progress": "[→]",
-            "completed":   "[✓]",
-            "failed":      "[✗]",
+            "in_progress": "[>]",
+            "completed":   "[Y]",
+            "failed":      "[N]",
         }
 
         lines = []

@@ -47,7 +47,7 @@ def _extract_exit_code(raw_output: str) -> Optional[int]:
 
 
 # Tools handled by named MCP methods
-_NAMED_TOOLS = {"nmap", "gobuster", "zap-spider", "zap-active", "sqlmap", "autorecon"}
+_NAMED_TOOLS = {"nmap", "gobuster", "zap-spider", "zap-active", "sqlmap", "autorecon", "sleep"}
 
 # Tools whose output is structured — parsed by code, no LLM needed
 _PARSED_TOOLS = {"nmap", "gobuster", "zap-spider", "zap-active", "autorecon"}
@@ -133,6 +133,9 @@ class ReconAgent:
             return await self.kali.zap_active(target_url)
         elif tool == "sqlmap":
             return await self.kali.sqlmap(target_url)
+        elif tool == "sleep":
+            await self.kali.execute("sleep 120")
+            return "[exit code: 0]\n[stdout]\nSlept 120 seconds to allow rate-limit/fail2ban cooldown."
         elif tool == "autorecon":
             parsed = urlparse(target_url)
             target = parsed.hostname or target_url

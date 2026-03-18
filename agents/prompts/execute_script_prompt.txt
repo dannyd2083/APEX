@@ -126,20 +126,27 @@ Then trigger the found path:
 
 --- SQL INJECTION ---
 Target a specific known endpoint and parameter — do NOT use --forms (too slow, scans the whole app).
+
+MANDATORY: ALWAYS pass --cookie="laravel_session=$SESSION" to sqlmap. No exceptions.
+Running sqlmap without --cookie on a Laravel/PHP app causes HTTP 419 on every request.
+Use the SPEED pattern below for ALL sqlmap calls — detection AND dump.
+
+For GET params with no CSRF (e.g. ?id=1), --cookie is still required if the target
+is a Laravel app. If truly no session needed, use a fresh curl cookie jar instead.
+
 Pick ONE of these patterns depending on whether the target uses POST or GET:
-    # POST example:
-    sqlmap -u "http://target/endpoint" --data "email=x&submit=1" -p email \
-           --flush-session --batch --level=2 | cat
+    # POST example (always use SPEED pattern below):
     # GET example:
-    sqlmap -u "http://target/endpoint?id=1" -p id --flush-session --batch --level=2 --dump | cat
+    sqlmap -u "http://target/endpoint?id=1" -p id --cookie="laravel_session=$SESSION" \
+           --flush-session --batch --level=2 --dump | cat
 If sqlmap returns "not injectable" and you suspect input validation is filtering payloads
 (e.g. email format check causes 500 on all payloads), escalate: add --level=3 --risk=2
 
-If the form has a CSRF token, do NOT use --csrf-url (it forces a new session per request,
-breaking boolean detection — sqlmap falls back to slow time-based). Use the SPEED pattern below.
+NEVER use --csrf-url — it forces a new session per request, breaking boolean detection.
+ALWAYS use the SPEED pattern below instead:
 
 SPEED — pre-fetch session + token to enable --threads:
-ALWAYS use this pattern for extraction/dump tasks (--dump, -D/-T):
+ALWAYS use this pattern for ALL sqlmap calls (detection AND dump):
 
 If session was already established (JSON file exists):
     HOST="admin_usage_htb"   # replace with sanitized hostname
@@ -183,6 +190,7 @@ Some apps return 200 with a session cookie -- follow up by fetching a protected 
 - For large pages (homepage, CSS): store in variable and grep only what matters
 - Always pipe interactive tools through | cat:  sqlmap ... | cat  /  hydra ... | cat
 - NEVER pipe sqlmap through | head — SIGPIPE kills sqlmap before results are extracted
+- NEVER run sqlmap without --cookie — on Laravel/PHP this causes HTTP 419 on every request
 - NEVER use --threads with --csrf-url — sqlmap will throw a CRITICAL error and abort
 - NEVER specify --technique=T alone — this forces time-based only (30-60 min per dump).
   Omit --technique entirely: sqlmap auto-tries all (boolean first, time-based as fallback).

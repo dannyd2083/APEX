@@ -84,6 +84,15 @@ class Coordinator:
                     print("[Coordinator] Cleaned /tmp/plante_*.json")
                 except Exception:
                     pass
+                try:
+                    # Remove stale /etc/hosts entries pointing to the target IP from previous runs
+                    target_ip = self.state.scope
+                    await self.execute.kali.execute(
+                        f"sudo sed -i '/{target_ip}/d' /etc/hosts 2>/dev/null; true"
+                    )
+                    print(f"[Coordinator] Cleaned /etc/hosts entries for {target_ip}")
+                except Exception:
+                    pass
                 _cleaned = True
             try:
               while not self.state.stop_reason():
@@ -132,7 +141,7 @@ class Coordinator:
                     break
     
                 agent = action.get("agent", "")
-                print(f"[Coordinator] → {agent.upper()}: {action.get('task') or action.get('reason', '')}")
+                print(f"[Coordinator] >> {agent.upper()}: {action.get('task') or action.get('reason', '')}")
     
                 # 5. Dispatch
                 agent_result      = None
@@ -233,7 +242,7 @@ class Coordinator:
                     if task:
                         self.state.set_task_note(lbl, note)
                         self.state.update_task_status(task.id, "completed")
-                        print(f"[Tree] ✓ completed {lbl} — {note[:60]}")
+                        print(f"[Tree] [Y] completed {lbl} - {note[:60]}")
 
                 # Fail tasks LLM marked failed
                 for t in action.get("fail_tasks", []):
@@ -244,7 +253,7 @@ class Coordinator:
                         self.state.set_task_note(lbl, note)
                         self.state.update_task_status(task.id, "failed")
                         self.state.add_failed_approach(f"{task.description}: {note}"[:200])
-                        print(f"[Tree] ✗ failed   {lbl} — {note[:60]}")
+                        print(f"[Tree] [N] failed   {lbl} - {note[:60]}")
 
                 # If coordinator judged the previous execute turn as failed,
                 # save execute_evidence as a script lesson for future execute turns.
@@ -267,8 +276,13 @@ class Coordinator:
 
                 # Store persistent discoveries in key_facts
                 if action.get("set_key_facts"):
-                    self.state.set_key_facts(action["set_key_facts"])
-                    print(f"[KeyFacts] updated: {list(action['set_key_facts'].keys())}")
+                    kf = action["set_key_facts"]
+                    self.state.set_key_facts(kf)
+                    print(f"[KeyFacts] updated: {list(kf.keys())}")
+                    # If coordinator discovered the real hostname, update target_url
+                    if "target_url" in kf:
+                        self.state.target_url = kf["target_url"]
+                        print(f"[Target] updated to: {self.state.target_url}")
 
                 # Update RAG query for next turn
                 if action.get("rag_query"):
