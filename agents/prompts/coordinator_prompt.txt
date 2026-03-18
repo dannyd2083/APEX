@@ -251,6 +251,17 @@ Extraction rate limited mid-run:
   -> Do NOT log the technique as a failed approach. Do NOT pivot to other attack vectors.
   -> Sleep, then retry the SAME extraction approach but slower (add delays, reduce request volume).
 
+Hash completeness — verify before cracking:
+- MD5=32 chars, SHA1=40, SHA256=64. Check length before attempting offline crack.
+- Shorter than expected = incomplete extraction. On rate-limited targets, fail2ban
+  returns connection refused (0ms) which time-based SQLi misreads as "false",
+  producing wrong/truncated output.
+  -> Do NOT crack an incomplete hash — it will always return 0 results.
+  -> Retry extraction using a longer SLEEP value to widen the true/false timing gap.
+- Offline crack returned 0 results?
+  -> Check hash length FIRST. If incomplete, fix the extraction.
+  -> Only pivot away if hash is verified complete (correct length) and still no match.
+
 ---
 
 JUDGING EXECUTE RESULTS — you decide success, not the execute agent:
