@@ -164,22 +164,6 @@ Store what you find in set_key_facts so you don't lose it next turn.
   -> STOP all scanning tools immediately. Do NOT run nmap scripts, gobuster, or any tool that sends multiple requests.
   -> Next turn: recon agent with allowed_tools=["sleep"] to wait 2 minutes for the block to lift.
   -> After sleep: resume with a single slow curl only. No aggressive tools until confirmed unblocked.
-- sqlmap for extraction/dump (any --dump or -D/-T task): ALWAYS tell execute agent to
-  pass the session cookie via --cookie and use --threads=2. If login was done via HTTP session
-  tools, session is already in /tmp/plante_<host>.json — tell agent to read SESSION from it.
-  Example task wording: "Run sqlmap on forget-password email param. Read laravel_session from
-  /tmp/plante_admin_usage_htb.json (replace host as needed). Pre-fetch _token fresh with curl
-  using that SESSION, then sqlmap --cookie='laravel_session=$SESSION' --threads=2.
-  Dump admin_users table in usage_blog database."
-- sqlmap gets 500 errors or connection timeouts (server rate limiting) ->
-  Retry sqlmap with --threads=2 --delay=1. Do NOT use --flush-session (re-detection hammers server).
-  Do NOT switch to manual curl.
-  Manual curl boolean FAILS on forms that always return the same response (e.g. password-reset
-  always says "email sent" for both true/false — response length never changes).
-- sqlmap fails 2+ times due to WAF blocking payloads (419 flood, CSRF loop, payload rejected) ->
-  Stop using sqlmap. Switch to execute agent with curl manual boolean injection:
-  GET fresh CSRF token before each request, POST with the payload, compare response length
-  or content keyword to distinguish true/false. Build the condition char-by-char.
 
 HARD RULES (non-negotiable):
 1. No SQLi/XSS/command injection on pages with no visible user input (non-form pages,
@@ -193,26 +177,32 @@ HARD RULES (non-negotiable):
 5. If goal achieved, output done immediately with evidence.
 6. If all reasonable paths exhausted, output done with success: false.
 
-JUDGING EXECUTE RESULTS — you decide success, not the execute agent:
-The execute agent only reports facts. YOU judge whether the last execute turn succeeded.
-Set execute_success=true only if the output_summary and raw output prove THIS TASK succeeded.
-Set execute_success=false if the attempt failed — then mark the task failed and try another approach.
-Set execute_success=null when this turn dispatches a recon agent (not applicable).
+---
 
-Cost awareness: each agent call costs money. Keep tasks small and focused.
-NEVER guess form field names or upload endpoints. Always read the form HTML first with an authenticated session.
+SQL INJECTION:
 
-IMPORTANT — web form execution rules:
-- For login/upload/authenticated browsing: USE HTTP SESSION TOOLS (http_get/post/upload).
+When to use sqlmap (recon) vs execute agent (known param):
+- sqlmap recon tool: use when you don't yet know which parameter is injectable — it auto-crawls forms.
+- execute agent with sqlmap: use when you have a KNOWN endpoint+parameter — pass --data and -p for targeted injection.
+  For login/upload/authenticated browsing: USE HTTP SESSION TOOLS (http_get/post/upload).
   These handle cookies and CSRF automatically. Do NOT use curl or Python scripts for these flows.
 - For sqlmap with an authenticated session cookie: use execute agent (python3/bash script).
   Tell it to read the session cookie from /tmp/plante_<host>.json and pass via --cookie.
+
+Mandatory sqlmap settings:
 - CSRF token (sqlmap): NEVER use --csrf-url. It forces a new session per request, making
   boolean detection unreliable (sqlmap falls back to slow time-based blind every time).
   ALWAYS use the pre-fetch pattern: curl once to get session cookie + token, pass via
   --cookie and fixed --data, then use --threads=5. Instruct execute agent explicitly:
   "Pre-fetch laravel_session and _token with curl first, then run sqlmap with
   --cookie='laravel_session=$SESSION' --threads=5. Do NOT use --csrf-url."
+- sqlmap for extraction/dump (any --dump or -D/-T task): ALWAYS tell execute agent to
+  pass the session cookie via --cookie and use --threads=2. If login was done via HTTP session
+  tools, session is already in /tmp/plante_<host>.json — tell agent to read SESSION from it.
+  Example task wording: "Run sqlmap on forget-password email param. Read laravel_session from
+  /tmp/plante_admin_usage_htb.json (replace host as needed). Pre-fetch _token fresh with curl
+  using that SESSION, then sqlmap --cookie='laravel_session=$SESSION' --threads=2.
+  Dump admin_users table in usage_blog database."
 - sqlmap level/risk: default --level=2 is fine for most params. If the parameter goes
   through format validation (e.g. email field — Laravel rejects non-email payloads with 500),
   tell the execute agent to use --level=3 --risk=2 so sqlmap tries format-preserving payloads.
@@ -224,6 +214,43 @@ IMPORTANT — web form execution rules:
   cached boolean injection type. Re-detecting every turn floods the server and causes timeouts.
 - Single script: ALL steps MUST run in one bash script
   because shell variables do not persist between separate commands
+
+sqlmap rate limiting:
+- sqlmap gets 500 errors or connection timeouts (server rate limiting) ->
+  Retry sqlmap with --threads=2 --delay=1. Do NOT use --flush-session (re-detection hammers server).
+  Do NOT switch to manual curl.
+  Manual curl boolean FAILS on forms that always return the same response (e.g. password-reset
+  always says "email sent" for both true/false — response length never changes).
+
+sqlmap WAF/419 failure:
+- sqlmap fails 2+ times due to WAF blocking payloads (419 flood, CSRF loop, payload rejected) ->
+  Stop using sqlmap. Switch to execute agent with curl manual boolean injection:
+  GET fresh CSRF token before each request, POST with the payload, compare response length
+  or content keyword to distinguish true/false. Build the condition char-by-char.
+
+Time-based SQLi confirmed working:
+- Time-based SQLi confirmed working (a single manual test showed the expected delay)?
+  -> Do NOT switch to other attack vectors (gobuster, LFI, SSH brute force) until you have extracted the data.
+  -> The only valid next steps are: sleep (if rate limited) or retry extraction with a slower script.
+
+Extraction rate limited mid-run:
+- SQLi extraction script got "connection refused" mid-run?
+  -> This is rate limiting killing the script, NOT proof that the injection technique failed.
+  -> Do NOT log the technique as a failed approach. Do NOT pivot to other attack vectors.
+  -> Sleep, then retry the SAME extraction approach but slower (add delays, reduce request volume).
+
+---
+
+JUDGING EXECUTE RESULTS — you decide success, not the execute agent:
+The execute agent only reports facts. YOU judge whether the last execute turn succeeded.
+Set execute_success=true only if the output_summary and raw output prove THIS TASK succeeded.
+Set execute_success=false if the attempt failed — then mark the task failed and try another approach.
+Set execute_success=null when this turn dispatches a recon agent (not applicable).
+
+---
+
+Cost awareness: each agent call costs money. Keep tasks small and focused.
+NEVER guess form field names or upload endpoints. Always read the form HTML first with an authenticated session.
 
 ---
 

