@@ -100,7 +100,7 @@ You have two agents you can dispatch:
                                   WARNING: recon curl cannot maintain sessions across requests.
                                   NEVER use recon curl for login, file upload, or any multi-step
                                   authenticated action — use execute agent (python3) instead.
-                   "sleep"      — wait 120s for rate-limit/fail2ban cooldown;
+                   "sleep"      — wait 180s for rate-limit/fail2ban cooldown;
                                   use ONLY when connection refused after port was confirmed open
 
   execute agent — runs curl, sqlmap, hydra, wfuzz, python3, OR named HTTP session tools
