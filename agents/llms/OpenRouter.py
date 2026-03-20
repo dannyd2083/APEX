@@ -15,7 +15,7 @@ class OpenRouterLLM:
             api_key=llm_settings.OPENROUTER_API_KEY,
             base_url=llm_settings.OPENROUTER_BASE_URL,
             model=self.model_name,
-            max_tokens=4096
+            max_tokens=8192
         )
 
     def _fetch_generation_cost(self, gen_id: str) -> float | None:

@@ -9,11 +9,17 @@ KALI LINUX CONSTRAINTS — these apply to every script, no exceptions:
 - NEVER use set -e — grep returns exit 1 on no match, which kills the script
 - If writing Python, the script MUST start with: #!/usr/bin/env python3
   Without this shebang the shell will try to execute Python code as bash and fail.
-- For exploit-db scripts: use searchsploit to get the local copy — do NOT wget any URL.
-  The file is already on Kali's local exploit-db database:
+- Before writing a custom exploit for any known CVE, ALWAYS check searchsploit first:
+      searchsploit CVE-XXXX-XXXX   # or searchsploit <service> <version>
+  If a result exists: use searchsploit -m <ID> to get the local copy and run it directly.
+  Only write a custom script if searchsploit returns NO results.
+- For exploit-db scripts (whether found via searchsploit or ID given in task):
       searchsploit -m 46635        # copies 46635.py to current directory
       python2 ./46635.py [args]    # always run with python2, never python3
-  Do NOT convert the script. Do NOT use sed on it. Do NOT add a shebang. Just python2.
+  Do NOT open, read, print, or cat the file contents.
+  Do NOT convert, rewrite, or replace the script under any circumstances.
+  If you need to know the arguments: run python2 ./46635.py --help OR head -5 ./46635.py ONLY.
+  Then run it immediately. The script is tested and correct — trust it.
 
 Target : __TARGET_URL__
 Task   : __TASK__
@@ -31,8 +37,10 @@ Python stdlib (always available, NEVER pip install): os, sys, time, subprocess, 
 If you need a third-party library not in the list above, install it BEFORE importing it:
     import subprocess; subprocess.run(["pip","install","--break-system-packages","-q","libname"], check=False)
 NEVER pip install stdlib modules — they are built-in and pip will fail to find them.
-If a script fails with ImportError or ModuleNotFoundError, fix it by upgrading the broken package:
-    pip install --break-system-packages --upgrade <package_name>
+If a script fails with ImportError or ModuleNotFoundError, install the missing package BEFORE
+re-running. Match the installer to the Python version:
+    pip install --break-system-packages -q <package_name>        # python3 scripts
+    python2 -m pip install --break-system-packages -q <package>  # python2 scripts
 Then re-run the script in the same bash script (no separate call needed).
 
 The sections below are REFERENCE PATTERNS — templates to adapt, not rules to copy verbatim.

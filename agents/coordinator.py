@@ -53,6 +53,7 @@ class Coordinator:
             scope=state.scope,
         )
         self._rag_query = ""  # set by LLM after first recon; empty = skip RAG on Turn 1
+        self._exec_fail_streak: dict = {}  # current_task → consecutive execute_success=false count
 
     # ------------------------------------------------------------------
     # Main loop
@@ -82,6 +83,11 @@ class Coordinator:
                 try:
                     await self.execute.kali.execute("rm -f /tmp/plante_*.json")
                     print("[Coordinator] Cleaned /tmp/plante_*.json")
+                except Exception:
+                    pass
+                try:
+                    await self.execute.kali.execute("rm -f /tmp/plante_last_script.py /tmp/plante_last_script.sh")
+                    print("[Coordinator] Cleaned /tmp/plante_last_script.*")
                 except Exception:
                     pass
                 try:
@@ -118,6 +124,13 @@ class Coordinator:
 
                 # 3. Build prompt
                 snapshot_dict = self.state.to_brain_snapshot()
+                # Inject loop warnings so coordinator can see it's stuck
+                loop_warns = {k: v for k, v in self._exec_fail_streak.items() if v >= 2}
+                if loop_warns:
+                    snapshot_dict["loop_warnings"] = {
+                        k: f"LOOP DETECTED: task '{k}' has failed {v} consecutive execute turns without fail_tasks. You MUST output fail_tasks for this task or change approach entirely."
+                        for k, v in loop_warns.items()
+                    }
                 snapshot      = json.dumps(snapshot_dict, indent=2)
                 prompt = (
                     self._prompt
@@ -183,18 +196,12 @@ class Coordinator:
                         allowed_tools=action.get("allowed_tools"),
                         context=self._context_for_execute(),
                         http_params=action.get("http_params"),
+                        repair_mode=action.get("repair_mode", False),
                     )
                     last_result       = self._format_execute(result)
                     agent_result_text = last_result
                     print(f"\n{last_result}")
                     self._ingest_execute(result)
-                    # Update exploit/verify task status based on result
-                    if self.state.current_task_id:
-                        ct = self.state.tasks[self.state.current_task_id]
-                        if ct.task_type in ('exploit', 'verify') and ct.status == 'in_progress':
-                            new_status = 'completed' if result.success else 'failed'
-                            self.state.update_task_status(self.state.current_task_id, new_status)
-                            print(f"[Coordinator] Task {new_status}: {ct.description[:60]}")
                     agent_result = {
                         "success":        result.success,
                         "output_summary": result.output_summary,
@@ -257,11 +264,28 @@ class Coordinator:
 
                 # If coordinator judged the previous execute turn as failed,
                 # save execute_evidence as a script lesson for future execute turns.
-                if action.get("execute_success") is False or action.get("execute_success") == "false":
+                exec_success = action.get("execute_success")
+                if exec_success is False or exec_success == "false":
                     evidence = action.get("execute_evidence", "")
                     if evidence and evidence != "null":
                         self.state.add_script_lesson(f"Previous execute failed: {evidence}")
                         print(f"[Lessons] recorded: {evidence[:80]}")
+                    # Track streak: if coordinator sees failure but doesn't output fail_tasks,
+                    # increment counter so we can warn it next turn.
+                    streak_key = action.get("current_task", "unknown")
+                    failed_labels = {t.get("label", "") for t in action.get("fail_tasks", [])}
+                    if streak_key not in failed_labels:
+                        self._exec_fail_streak[streak_key] = self._exec_fail_streak.get(streak_key, 0) + 1
+                        streak = self._exec_fail_streak[streak_key]
+                        if streak >= 2:
+                            print(f"[LoopDetect] Task '{streak_key}' has {streak} consecutive execute failures without fail_tasks")
+                else:
+                    # Reset streak on success or when coordinator explicitly fails the task
+                    streak_key = action.get("current_task", "")
+                    if streak_key:
+                        self._exec_fail_streak.pop(streak_key, None)
+                    for t in action.get("fail_tasks", []):
+                        self._exec_fail_streak.pop(t.get("label", ""), None)
 
                 # Add new child tasks
                 for t in action.get("add_tasks", []):

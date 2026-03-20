@@ -62,7 +62,8 @@ class ExecuteAgent:
                   task: str,
                   allowed_tools: Optional[list] = None,
                   context: str = "",
-                  http_params: Optional[dict] = None) -> ExecuteResult:
+                  http_params: Optional[dict] = None,
+                  repair_mode: bool = False) -> ExecuteResult:
 
         # HTTP session tools — bypass LLM script generation entirely
         if http_params and allowed_tools and allowed_tools[0] in self._HTTP_TOOLS:
@@ -79,6 +80,27 @@ class ExecuteAgent:
             .replace("__ALLOWED_TOOLS__", tools_str)
             .replace("__CONTEXT__",       context_str)
         )
+
+        # Repair mode: read the failed script from Kali and ask LLM to fix it
+        if repair_mode:
+            try:
+                failed_script = await self.kali.execute(
+                    "cat /tmp/plante_last_script.py 2>/dev/null || "
+                    "cat /tmp/plante_last_script.sh 2>/dev/null || "
+                    "echo '(no saved script found)'"
+                )
+                script_prompt += (
+                    "\n\n--- REPAIR MODE ---\n"
+                    "The previous script attempt failed with a code error (see SCRIPT LESSONS above).\n"
+                    "Here is the script that failed:\n\n"
+                    f"{failed_script[:8000]}\n\n"
+                    "Output the COMPLETE corrected script. Fix only what is broken — "
+                    "preserve all working parts. Do NOT start from scratch."
+                )
+                print(f"[ExecuteAgent] REPAIR MODE — loaded {len(failed_script)} chars of failed script")
+            except Exception as e:
+                print(f"[ExecuteAgent] REPAIR MODE — could not read saved script: {e}")
+
         script_text = self.llm._call(script_prompt, phase="execute_plan")
         script = _extract_script(script_text)
 

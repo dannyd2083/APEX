@@ -60,6 +60,12 @@ Other rules:
 - Do NOT add a task that already exists in the tree
 - Always complete/fail the previous turn's current_task before starting a new one
 - If a vector shows [N] failed, do NOT add more children to it — it is exhausted
+- When ALL children of a vector are [N] failed → immediately output fail_tasks for that vector
+- When a phase (1.1–1.4) has no remaining [ ] or [>] tasks → close it with complete_tasks or fail_tasks
+- Before adding a new child to a vector that already has [N] failed children: check whether the
+  new approach is fundamentally different (different tool, different endpoint, different technique)
+  from the failed ones. If it is only a variation (same tool, same endpoint, tweaked parameters),
+  do NOT add it — output fail_tasks for the vector instead.
 
 Example tree and operations:
 Tree seen:
@@ -148,13 +154,18 @@ The "csrf_token" field is auto-extracted — store it immediately via set_key_fa
 Store what you find so you don't lose it next turn.
 
 SET_KEY_FACTS — store immediately when you find any of these:
-- csrf_token from http_get response
+- Any token or session key needed for future requests: csrf_token, form_key, admin_key, _token —
+  regardless of whether it came from http_get, a python3 script, or raw output.
+  A value passed only in a task instruction is NOT persisted. action_history values go stale.
+  Only key_facts survives reliably across turns.
 - complete injectable URL with ALL query parameters (e.g. /module.php?mact=News,m1_,default,0&m1_idlist=1)
 - extracted credentials, hashes, usernames
 - uploaded file path returned by server
 - version numbers that confirm a specific CVE
 - any value you will reference in a future turn's task instruction
 Do not rely on reconstructing these from memory — raw output is not carried forward.
+IMPORTANT: If a token was stored more than 2 turns ago, treat it as potentially expired.
+Fetch a fresh one before using it.
 
 - Target is an IP and recon reveals a redirect to a hostname (e.g. http://10.x.x.x -> http://usage.htb)?
   -> IMMEDIATELY set_key_facts: {"target_url": "http://usage.htb"} and use that hostname for ALL subsequent requests.
@@ -179,6 +190,10 @@ HARD RULES (non-negotiable):
    inject directly — no prior zap-active needed.
    Auth attempts, cookie manipulation, IDOR, parameter tampering need NO prior scan.
 2. Never repeat a failed approach. Check failed_approaches before every decision.
+   When dispatching an execute task that creates a side effect (user account created, config
+   changed, file uploaded), the task instruction MUST include verification: tell execute agent
+   to confirm the side effect in the same script (e.g. after SQLi to create a user, immediately
+   attempt login with those credentials and report whether it succeeded).
 3. Never target URLs or services not confirmed to exist on this target.
 4. Run ONE tool per turn.
 5. If goal achieved, output done immediately with evidence.
@@ -254,10 +269,25 @@ Time-based SQLi under rate limiting:
 JUDGING EXECUTE RESULTS — you decide success, not the execute agent:
 The execute agent only reports facts. YOU judge whether the last execute turn succeeded.
 Set execute_success=true only if the output_summary and raw output prove THIS TASK succeeded.
-Set execute_success=false if the attempt failed — then mark the task failed and try another approach.
 Set execute_success=null when this turn dispatches a recon agent (not applicable).
-IMPORTANT: Script/environment errors (ImportError, command not found, timeout) are NOT technique
-failures. Do not mark the technique as failed — fix the environment and retry.
+
+When execute_success=false, follow these steps IN ORDER:
+Step 1 — READ the actual error from raw output. Identify the SPECIFIC error type.
+Step 2 — Decide based on what the error says:
+  - SyntaxError / NameError / unterminated string / unexpected EOF / IndentationError:
+      SCRIPT ERROR — the generated code has a bug (truncated or malformed), NOT an approach failure.
+      Set "repair_mode": true in your action JSON. Keep the same task description.
+      The execute agent will read the saved script from Kali and output a corrected version.
+      Max 2 repair attempts before treating as approach failure and outputting fail_tasks.
+  - ImportError / ModuleNotFoundError / command not found:
+      Environment error. Fix the specific package/tool, retry ONCE. If it fails again → fail_tasks.
+  - 404 / wrong URL:
+      Fix the URL using confirmed findings, retry ONCE.
+  - Any other failure (exploit returned login page, wrong credentials, logic error, wrong output):
+      Output fail_tasks IMMEDIATELY. Do not rewrite the script. Do not retry.
+Step 3 — NEVER theorize about what might be wrong before reading the actual error.
+  NEVER rewrite a script based on reading its source code — run it, read the error, fix that error.
+  If loop_warnings appears in the state snapshot, you are stuck. You MUST output fail_tasks.
 
 ---
 
@@ -288,6 +318,7 @@ For recon or execute:
   "rag_query": "<2-5 word exploit/escalate technique — e.g. 'file upload bypass', 'PHP webshell RCE', 'linux privesc SUID'. Leave EMPTY string for recon turns and authenticate phase — you already know how to test credentials and cookies>",
   "execute_success": "<true|false|null — YOUR judgment of the PREVIOUS execute turn; null if this turn is recon or turn 1>",
   "execute_evidence": "<one sentence: what in the output proves success or failure — null if not applicable>",
+  "repair_mode": "<true if retrying after SyntaxError/NameError/IndentationError — omit or false otherwise>",
   "complete_tasks": [{"label": "<label>", "note": "<what was found/achieved, under 80 chars>"}],
   "fail_tasks":     [{"label": "<label>", "note": "<why it failed, under 80 chars>"}],
   "add_tasks":      [{"parent": "<parent label>", "description": "<next step, under 80 chars>"}]
