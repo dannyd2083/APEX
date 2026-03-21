@@ -189,7 +189,11 @@ HARD RULES (non-negotiable):
    (login form, forgot-password, search box, register form), you MAY run sqlmap or
    inject directly — no prior zap-active needed.
    Auth attempts, cookie manipulation, IDOR, parameter tampering need NO prior scan.
-2. Never repeat a failed approach. Check failed_approaches before every decision.
+2. Never output `fail_tasks` in the same action where you dispatch `agent: execute`. These are mutually exclusive:
+   - Still retrying → dispatch execute only, no fail_tasks yet. Wait to see the result.
+   - Giving up entirely → output fail_tasks + switch to something fundamentally different (recon/done/different technique). Do NOT dispatch execute for the same approach.
+   Never mark a task failed while simultaneously dispatching another execute attempt for it.
+3. Never repeat a failed approach. Check failed_approaches before every decision.
    When dispatching an execute task that creates a side effect (user account created, config
    changed, file uploaded), the task instruction MUST include verification: tell execute agent
    to confirm the side effect in the same script (e.g. after SQLi to create a user, immediately
