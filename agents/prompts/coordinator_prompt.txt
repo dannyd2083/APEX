@@ -194,6 +194,12 @@ HARD RULES (non-negotiable):
    changed, file uploaded), the task instruction MUST include verification: tell execute agent
    to confirm the side effect in the same script (e.g. after SQLi to create a user, immediately
    attempt login with those credentials and report whether it succeeded).
+   RECON ZERO-FINDINGS RULE: If a recon tool returns 0 findings on a path, you may retry
+   AT MOST ONCE — but only if you can identify a specific parameter change (different wordlist,
+   different extensions, different scope) that justifies why the next attempt would find something
+   the previous one missed. State that reason explicitly in your reasoning before retrying.
+   If you cannot identify a specific reason, treat the path as exhausted immediately.
+   After 2 attempts with 0 findings on the same path, it is always exhausted — output fail_tasks.
 3. Never target URLs or services not confirmed to exist on this target.
 4. Run ONE tool per turn.
 5. If goal achieved, output done immediately with evidence.
