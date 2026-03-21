@@ -59,6 +59,15 @@ class OpenRouterLLM:
 
         output_text = response.content if hasattr(response, "content") else str(response)
 
+        # Retry up to 2 more times if API returned empty string (transient OpenRouter issue)
+        for _empty_retry in range(2):
+            if output_text.strip():
+                break
+            print(f"[LLM] {phase} returned empty response — retrying (attempt {_empty_retry + 1})")
+            time.sleep(3)
+            response    = invoker.invoke(prompt)
+            output_text = response.content if hasattr(response, "content") else str(response)
+
         output_tokens = len(output_text) // 4
         actual_cost   = None
 
