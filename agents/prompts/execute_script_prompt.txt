@@ -242,6 +242,11 @@ Check HTTP code after a login POST:
 Some apps return 200 with a session cookie -- follow up by fetching a protected page to confirm.
 
 --- NEVER ---
+- NEVER run commands that block waiting for input (nc, socat, reverse shell listeners) without a
+  timeout — they hang forever if no connection arrives. Choose a time appropriate for the task.
+  Use: timeout N nc -nlvp PORT > /tmp/nc_out.txt 2>&1 & NC_PID=$!; sleep N; cat /tmp/nc_out.txt
+- ALWAYS add --max-time 30 to every curl command — without it, a slow or unresponsive server
+  blocks the entire script indefinitely.
 - NEVER use set -e (grep returns exit 1 on no match, which kills the script)
 - NEVER use grep -P or grep -oP (Perl regex mode is unreliable on Kali)
 - NEVER use \K in grep patterns — \K is Perl-only, requires -P, will silently produce empty output

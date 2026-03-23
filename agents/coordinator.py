@@ -147,10 +147,20 @@ class Coordinator:
                 reasoning = self._extract_reasoning(response)
                 print(f"[Coordinator] Reasoning:\n{reasoning}")
 
-                # 4. Parse ACTION block
+                # 4. Parse ACTION block — retry once with brevity hint if truncated
                 action = self._parse_action(response)
                 if action is None:
-                    print("[Coordinator] Could not parse ACTION block — stopping")
+                    print("[Coordinator] Could not parse ACTION block — retrying with brevity hint")
+                    retry_prompt = (
+                        prompt
+                        + "\n\nIMPORTANT: Your previous response was not valid JSON (likely truncated)."
+                        + " Output ONLY the JSON object. Keep the 'reasoning' field to 2-3 sentences maximum."
+                    )
+                    response  = self.llm._call(retry_prompt, phase="coordinator_retry", json_mode=True)
+                    reasoning = self._extract_reasoning(response)
+                    action    = self._parse_action(response)
+                if action is None:
+                    print("[Coordinator] Could not parse ACTION block after retry — stopping")
                     break
     
                 agent = action.get("agent", "")
@@ -358,19 +368,38 @@ class Coordinator:
               _run_error = str(e)
               print(f"[Coordinator] CRASHED: {e}")
 
-          # Extension prompt — ask user to add more turns if budget exhausted or coordinator gave up
-          if ((self.state.stop_reason() == "budget_turns_exceeded" or _gave_up)
-                  and not self.state.goal_achieved
-                  and not _run_error):
-              try:
-                  raw   = input(f"\n[+] {self.state.total_turns} turns used. Add how many more? (0 to stop): ").strip()
-                  extra = int(raw) if raw else 0
-              except (ValueError, EOFError):
-                  extra = 0
-              if extra > 0:
-                  self.state.max_turns += extra
-                  _gave_up = False
-                  print(f"[Coordinator] +{extra} turns — {self.state.max_turns - self.state.total_turns} remaining")
+          # Extension prompt — only fires for the limit the user actually set
+          _stop = self.state.stop_reason()
+          _turns_hit = _stop == "budget_turns_exceeded" and getattr(self.state, "_turns_limited", True)
+          _cost_hit  = _stop == "budget_cost_exceeded"  and getattr(self.state, "_cost_limited",  True)
+          if ((_turns_hit or _cost_hit or _gave_up) and not self.state.goal_achieved and not _run_error):
+              _extended = False
+              if _turns_hit or _gave_up:
+                  try:
+                      raw   = input(f"\n[+] {self.state.total_turns} turns used. Add how many more? (0 to stop): ").strip()
+                      extra = int(raw) if raw else 0
+                  except (ValueError, EOFError):
+                      extra = 0
+                  if extra > 0:
+                      self.state.max_turns += extra
+                      # Extend cost proportionally so it doesn't block immediately
+                      avg_turn_cost = self.state.total_cost_usd / max(self.state.total_turns, 1)
+                      self.state.max_cost_usd += avg_turn_cost * extra
+                      _gave_up = False
+                      _extended = True
+                      print(f"[Coordinator] +{extra} turns — {self.state.max_turns - self.state.total_turns} remaining")
+              elif _cost_hit:
+                  try:
+                      raw   = input(f"\n[+] ${self.state.total_cost_usd:.2f} spent. Add how much more budget in $? (0 to stop): ").strip()
+                      extra = float(raw) if raw else 0.0
+                  except (ValueError, EOFError):
+                      extra = 0.0
+                  if extra > 0:
+                      self.state.max_cost_usd += extra
+                      _gave_up = False
+                      _extended = True
+                      print(f"[Coordinator] +${extra:.2f} budget — ${self.state.max_cost_usd - self.state.total_cost_usd:.2f} remaining")
+              if _extended:
                   continue
           break
 
@@ -546,8 +575,8 @@ async def main():
     parser.add_argument("--scope",       default=None,
                         help="Scope IP/domain. Defaults to target host.")
     parser.add_argument("--target-name", default="target")
-    parser.add_argument("--max-turns",   type=int,   default=20)
-    parser.add_argument("--max-cost",    type=float, default=5.0)
+    parser.add_argument("--max-turns",   type=int,   default=None)
+    parser.add_argument("--max-cost",    type=float, default=None)
     args = parser.parse_args()
 
     from urllib.parse import urlparse
@@ -574,16 +603,24 @@ async def main():
         db         = None
         session_id = 1
 
+    # Only enforce limits the user explicitly passed; leave the other at infinity
+    _max_turns = args.max_turns if args.max_turns is not None else 999999
+    _max_cost  = args.max_cost  if args.max_cost  is not None else 999999.0
+    _turns_limited = args.max_turns is not None
+    _cost_limited  = args.max_cost  is not None
+
     state = PentestState(
         session_id=session_id,
         target_url=args.target_url,
         target_name=args.target_name,
         goal=args.goal,
         scope=scope,
-        max_turns=args.max_turns,
-        max_cost_usd=args.max_cost,
+        max_turns=_max_turns,
+        max_cost_usd=_max_cost,
         db=db,
     )
+    state._turns_limited = _turns_limited
+    state._cost_limited  = _cost_limited
 
     coordinator = Coordinator(llm, state, worker_llm=worker_llm)
     try:

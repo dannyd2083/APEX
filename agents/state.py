@@ -74,7 +74,7 @@ class PentestState:
 
     total_cost_usd: float = 0.0
     total_turns:    int   = 0
-    max_cost_usd:   float = 5.0
+    max_cost_usd:   float = 20.0
     max_turns:      int   = 50
 
     goal_achieved: bool          = False
