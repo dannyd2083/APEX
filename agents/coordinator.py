@@ -13,7 +13,6 @@ from agents.helpers.run_logger import RunLogger
 from agents.helpers.payloads_rag import PayloadsRAG
 from agents.llms.OpenRouter import OpenRouterLLM
 from agents.config.constants import WORKER_MODEL_NAME
-from agents.logger import DatabaseLogger
 from agents.recon_agent import ReconAgent, ReconResult
 from agents.execute_agent import ExecuteAgent, ExecuteResult
 from agents.state import PentestState
@@ -586,22 +585,8 @@ async def main():
     worker_llm = OpenRouterLLM(model_name=WORKER_MODEL_NAME)  # cheap — recon/execute
     print(f"[Coordinator] Models: coordinator={llm.model_name} | workers={worker_llm.model_name}")
 
-    try:
-        db         = DatabaseLogger()
-        session_id = db.start_session(
-            target_url=args.target_url,
-            target_name=args.target_name,
-            goal=args.goal,
-            scope=scope,
-            max_cost_usd=args.max_cost,
-            max_turns=args.max_turns,
-        )
-        if not session_id:
-            raise RuntimeError("start_session returned None")
-    except Exception as e:
-        print(f"[Coordinator] DB unavailable — running without logging ({e})")
-        db         = None
-        session_id = 1
+    db         = None
+    session_id = 1
 
     # Only enforce limits the user explicitly passed; leave the other at infinity
     _max_turns = args.max_turns if args.max_turns is not None else 999999

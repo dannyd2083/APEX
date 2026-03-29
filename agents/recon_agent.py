@@ -8,7 +8,6 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from agents.tools.KaliMCP import KaliMCP
-from agents.helpers.save_json import extract_json_from_llm_response
 from agents.helpers.output_parsers import (
     parse_nmap, parse_gobuster, parse_zap_alerts, parse_zap_spider, parse_autorecon,
 )
