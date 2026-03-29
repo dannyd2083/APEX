@@ -283,18 +283,18 @@ Set execute_success=null when this turn dispatches a recon agent (not applicable
 
 When execute_success=false, follow these steps IN ORDER:
 Step 1 — READ the actual error from raw output. Identify the SPECIFIC error type.
-Step 2 — Decide based on what the error says:
-  - SyntaxError / NameError / unterminated string / unexpected EOF / IndentationError:
-      SCRIPT ERROR — the generated code has a bug (truncated or malformed), NOT an approach failure.
-      Set "repair_mode": true in your action JSON. Keep the same task description.
-      The execute agent will read the saved script from Kali and output a corrected version.
-      Max 2 repair attempts before treating as approach failure and outputting fail_tasks.
-  - ImportError / ModuleNotFoundError / command not found:
-      Environment error. Fix the specific package/tool, retry ONCE. If it fails again → fail_tasks.
-  - 404 / wrong URL:
-      Fix the URL using confirmed findings, retry ONCE.
-  - Any other failure (exploit returned login page, wrong credentials, logic error, wrong output):
-      Output fail_tasks IMMEDIATELY. Do not rewrite the script. Do not retry.
+Step 2 — Classify into exactly one of three types and fill execute_diagnosis:
+  - SCRIPT_ERROR: SyntaxError / NameError / unterminated string / unexpected EOF / IndentationError /
+      ImportError / ModuleNotFoundError / command not found.
+      The generated code has a bug, NOT an approach failure.
+      Set "repair_mode": true. Max 2 repair attempts before treating as FUNDAMENTAL.
+  - FIXABLE: 404 / wrong URL / wrong parameter name / missing header — a specific concrete mistake
+      that can be corrected in one retry. Fix the specific thing, retry ONCE. If it fails again → FUNDAMENTAL.
+  - FUNDAMENTAL: anything else — the technique/approach cannot work due to a technical or logical
+      reason (wrong service, permission denied structurally, binary corruption, endpoint doesn't exist,
+      approach already confirmed ineffective). Output fail_tasks IMMEDIATELY.
+      If the task's ↳ attempts already show a previous FUNDAMENTAL for the same root cause,
+      you are in a loop — fail_tasks is mandatory, no exceptions.
 Step 3 — NEVER theorize about what might be wrong before reading the actual error.
   NEVER rewrite a script based on reading its source code — run it, read the error, fix that error.
   If loop_warnings appears in the state snapshot, you are stuck. You MUST output fail_tasks.
@@ -328,6 +328,7 @@ For recon or execute:
   "rag_query": "<2-5 word exploit/escalate technique — e.g. 'file upload bypass', 'PHP webshell RCE', 'linux privesc SUID'. Leave EMPTY string for recon turns and authenticate phase — you already know how to test credentials and cookies>",
   "execute_success": "<true|false|null — YOUR judgment of the PREVIOUS execute turn; null if this turn is recon or turn 1>",
   "execute_evidence": "<one sentence: what in the output proves success or failure — null if not applicable>",
+  "execute_diagnosis": {"failure_type": "<FUNDAMENTAL|FIXABLE|SCRIPT_ERROR — required when execute_success=false>", "root_cause": "<WHY it fails mechanistically, not just what happened>", "evidence": "<specific line or error from raw output proving this>"},
   "repair_mode": "<true if retrying after SyntaxError/NameError/IndentationError — omit or false otherwise>",
   "complete_tasks": [{"label": "<label>", "note": "<what was found/achieved, under 80 chars>"}],
   "fail_tasks":     [{"label": "<label>", "note": "<why it failed, under 80 chars>"}],

@@ -52,7 +52,8 @@ class Coordinator:
             scope=state.scope,
         )
         self._rag_query = ""  # set by LLM after first recon; empty = skip RAG on Turn 1
-        self._exec_fail_streak: dict = {}  # current_task → consecutive execute_success=false count
+        self._exec_fail_streak: dict = {}   # current_task → consecutive execute_success=false count
+        self._fundamental_streak: dict = {} # current_task → consecutive FUNDAMENTAL classifications
 
     # ------------------------------------------------------------------
     # Main loop
@@ -272,29 +273,67 @@ class Coordinator:
                         print(f"[Tree] [N] failed   {lbl} - {note[:60]}")
 
                 # If coordinator judged the previous execute turn as failed,
-                # save execute_evidence as a script lesson for future execute turns.
+                # record structured diagnosis and update per-task attempt history.
                 exec_success = action.get("execute_success")
                 if exec_success is False or exec_success == "false":
-                    evidence = action.get("execute_evidence", "")
-                    if evidence and evidence != "null":
-                        self.state.add_script_lesson(f"Previous execute failed: {evidence}")
-                        print(f"[Lessons] recorded: {evidence[:80]}")
-                    # Track streak: if coordinator sees failure but doesn't output fail_tasks,
-                    # increment counter so we can warn it next turn.
-                    streak_key = action.get("current_task", "unknown")
+                    streak_key    = action.get("current_task", "unknown")
                     failed_labels = {t.get("label", "") for t in action.get("fail_tasks", [])}
+                    diag = action.get("execute_diagnosis") or {}
+
+                    if isinstance(diag, dict) and diag.get("failure_type"):
+                        ftype    = diag.get("failure_type", "")
+                        root     = diag.get("root_cause", "")
+                        ev_text  = diag.get("evidence", "")
+                        turn_num = self.state.total_turns + 1
+                        attempt_str = f"[T{turn_num}] {ftype}: {root}"
+                        if ev_text:
+                            attempt_str += f" ({ev_text[:80]})"
+                        if current_label:
+                            self.state.add_task_attempt(current_label, attempt_str)
+                            print(f"[Attempt] {current_label}: {attempt_str[:100]}")
+                        # SCRIPT_ERROR root cause → pass to execute agent as script lesson
+                        if ftype == "SCRIPT_ERROR" and root:
+                            self.state.add_script_lesson(root[:200])
+                        # FUNDAMENTAL streak: enforce fail_tasks on 2nd consecutive classification
+                        if ftype == "FUNDAMENTAL" and current_label and current_label not in failed_labels:
+                            self._fundamental_streak[current_label] = self._fundamental_streak.get(current_label, 0) + 1
+                            fund_count = self._fundamental_streak[current_label]
+                            print(f"[FundamentalTrack] Task '{current_label}' FUNDAMENTAL x{fund_count}")
+                            if fund_count >= 2:
+                                task_obj = self.state.get_task_by_label(current_label)
+                                if task_obj and task_obj.status != "failed":
+                                    note = (root or "FUNDAMENTAL — auto-failed after 2 classifications")[:120]
+                                    self.state.set_task_note(current_label, note)
+                                    self.state.update_task_status(task_obj.id, "failed")
+                                    self.state.add_failed_approach(f"{task_obj.description}: {note}"[:200])
+                                    print(f"[FundamentalEnforce] Auto-failed task '{current_label}'")
+                                self._fundamental_streak.pop(current_label, None)
+                                self._exec_fail_streak.pop(current_label, None)
+                        elif current_label:
+                            self._fundamental_streak.pop(current_label, None)
+                    else:
+                        # Fallback: old execute_evidence format
+                        evidence = action.get("execute_evidence", "")
+                        if evidence and evidence != "null":
+                            self.state.add_script_lesson(f"Previous execute failed: {evidence}")
+                            print(f"[Lessons] recorded: {evidence[:80]}")
+
+                    # Existing execute failure streak (drives loop_warnings next turn)
                     if streak_key not in failed_labels:
                         self._exec_fail_streak[streak_key] = self._exec_fail_streak.get(streak_key, 0) + 1
                         streak = self._exec_fail_streak[streak_key]
                         if streak >= 2:
                             print(f"[LoopDetect] Task '{streak_key}' has {streak} consecutive execute failures without fail_tasks")
                 else:
-                    # Reset streak on success or when coordinator explicitly fails the task
+                    # Reset all streaks on success or when coordinator explicitly fails the task
                     streak_key = action.get("current_task", "")
                     if streak_key:
                         self._exec_fail_streak.pop(streak_key, None)
+                        self._fundamental_streak.pop(streak_key, None)
                     for t in action.get("fail_tasks", []):
-                        self._exec_fail_streak.pop(t.get("label", ""), None)
+                        lbl = t.get("label", "")
+                        self._exec_fail_streak.pop(lbl, None)
+                        self._fundamental_streak.pop(lbl, None)
 
                 # Add new child tasks
                 for t in action.get("add_tasks", []):

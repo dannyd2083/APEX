@@ -34,6 +34,7 @@ class Task:
     status:      str = 'pending'  # pending, in_progress, completed, failed
     label:       str = ""   # human-readable: "1", "1.2", "1.2.3"
     note:        str = ""   # brief outcome written by LLM when completing/failing
+    attempts:    list = field(default_factory=list)  # per-task execute attempt history
 
     task_type:  str = 'discover'  # discover | exploit | verify
     parent_id:  Optional[str] = None
@@ -162,6 +163,12 @@ class PentestState:
         if lesson and lesson not in self.script_lessons:
             self.script_lessons.append(lesson[:200])
 
+    def add_task_attempt(self, label: str, attempt: str) -> None:
+        """Record an execute attempt result directly on the task node."""
+        task = self.get_task_by_label(label)
+        if task and attempt:
+            task.attempts.append(attempt[:300])
+
     def add_failed_approach(self, approach: str) -> None:
         if approach not in self.failed_approaches:
             self.failed_approaches.append(approach)
@@ -193,6 +200,10 @@ class PentestState:
             label   = f"{task.label} " if task.label else ""
             note    = f" — {task.note}" if task.note else ""
             lines.append(f"{indent}{icon} {label}{task.description}{note}")
+            # Show last 3 attempts for active/failed tasks so coordinator sees history inline
+            if task.status in ("in_progress", "failed") and task.attempts:
+                for att in task.attempts[-3:]:
+                    lines.append(f"{indent}    >> {att}")
             for child_id in task.children:
                 _render(child_id, depth + 1)
 
