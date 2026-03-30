@@ -1,7 +1,4 @@
-import requests as _requests
-
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
 
 from agents.config.constants import OPENROUTER_MODEL_NAME
 from agents.config.settings import llm_settings
@@ -18,20 +15,6 @@ class OpenRouterLLM:
             max_tokens=8192,
             request_timeout=300,
         )
-
-    def _fetch_generation_cost(self, gen_id: str) -> float | None:
-        """Query OpenRouter /api/v1/generation for the exact cost of a call."""
-        try:
-            r = _requests.get(
-                f"https://openrouter.ai/api/v1/generation?id={gen_id}",
-                headers={"Authorization": f"Bearer {llm_settings.OPENROUTER_API_KEY}"},
-                timeout=5,
-            )
-            if r.status_code == 200:
-                return float(r.json().get("data", {}).get("total_cost", 0.0))
-        except Exception:
-            pass
-        return None
 
     def _call(self, prompt: str, phase: str = "unknown", retries: int = 3,
               json_mode: bool = False) -> str:
@@ -92,10 +75,3 @@ class OpenRouterLLM:
         )
 
         return output_text
-
-    def _create_agent(self, tools, response_format):
-        return create_agent(
-            model=self.llm,
-            tools=tools,
-            response_format=response_format
-        )

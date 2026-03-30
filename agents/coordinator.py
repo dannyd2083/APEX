@@ -54,6 +54,7 @@ class Coordinator:
         self._rag_query = ""  # set by LLM after first recon; empty = skip RAG on Turn 1
         self._exec_fail_streak: dict = {}   # current_task → consecutive execute_success=false count
         self._fundamental_streak: dict = {} # current_task → consecutive FUNDAMENTAL classifications
+        self._child_fail_count: dict = {}   # parent_label → count of failed child tasks
 
     # ------------------------------------------------------------------
     # Main loop
@@ -125,12 +126,24 @@ class Coordinator:
                 # 3. Build prompt
                 snapshot_dict = self.state.to_brain_snapshot()
                 # Inject loop warnings so coordinator can see it's stuck
-                loop_warns = {k: v for k, v in self._exec_fail_streak.items() if v >= 2}
-                if loop_warns:
-                    snapshot_dict["loop_warnings"] = {
-                        k: f"LOOP DETECTED: task '{k}' has failed {v} consecutive execute turns without fail_tasks. You MUST output fail_tasks for this task or change approach entirely."
-                        for k, v in loop_warns.items()
-                    }
+                all_warnings = {}
+                for k, v in self._exec_fail_streak.items():
+                    if v >= 2:
+                        all_warnings[k] = f"LOOP DETECTED: task '{k}' has failed {v} consecutive execute turns without fail_tasks. You MUST output fail_tasks for this task or change approach entirely."
+                for parent_lbl, count in self._child_fail_count.items():
+                    if count >= 6:
+                        child_msg = f"CHILD LOOP: task '{parent_lbl}' has had {count} failed sub-tasks. You MUST output fail_tasks — do not create more sub-tasks."
+                    elif count >= 3:
+                        child_msg = f"CHILD LOOP: task '{parent_lbl}' has had {count} failed sub-tasks. If these are variations of the same technique, output fail_tasks instead of creating more sub-tasks."
+                    else:
+                        continue
+                    # Append to existing warning rather than overwrite (key may already exist from exec_fail_streak)
+                    if parent_lbl in all_warnings:
+                        all_warnings[parent_lbl] += " | " + child_msg
+                    else:
+                        all_warnings[parent_lbl] = child_msg
+                if all_warnings:
+                    snapshot_dict["loop_warnings"] = all_warnings
                 snapshot      = json.dumps(snapshot_dict, indent=2)
                 prompt = (
                     self._prompt
@@ -259,6 +272,7 @@ class Coordinator:
                     if task:
                         self.state.set_task_note(lbl, note)
                         self.state.update_task_status(task.id, "completed")
+                        self._child_fail_count.pop(lbl, None)
                         print(f"[Tree] [Y] completed {lbl} - {note[:60]}")
 
                 # Fail tasks LLM marked failed
@@ -271,6 +285,27 @@ class Coordinator:
                         self.state.update_task_status(task.id, "failed")
                         self.state.add_failed_approach(f"{task.description}: {note}"[:200])
                         print(f"[Tree] [N] failed   {lbl} - {note[:60]}")
+                        # Clear child fail count for explicitly failed tasks
+                        self._child_fail_count.pop(lbl, None)
+                        # Track failed children per parent for proliferation detection
+                        parts = lbl.split(".")
+                        if len(parts) > 1:
+                            parent_lbl = ".".join(parts[:-1])
+                            self._child_fail_count[parent_lbl] = self._child_fail_count.get(parent_lbl, 0) + 1
+                            count = self._child_fail_count[parent_lbl]
+                            print(f"[ChildFail] '{parent_lbl}' has {count} failed children")
+                            if count >= 8:
+                                parent_task = self.state.get_task_by_label(parent_lbl)
+                                if parent_task and parent_task.status not in ("failed", "completed"):
+                                    auto_note = f"Auto-failed: {count} child tasks all failed"
+                                    self.state.set_task_note(parent_lbl, auto_note)
+                                    self.state.update_task_status(parent_task.id, "failed")
+                                    self.state.add_failed_approach(f"{parent_task.description}: {auto_note}"[:200])
+                                    print(f"[ChildFailEnforce] Auto-failed '{parent_lbl}' after {count} failed children")
+                                # Always clean up regardless of whether parent was already failed
+                                self._child_fail_count.pop(parent_lbl, None)
+                                self._exec_fail_streak.pop(parent_lbl, None)
+                                self._fundamental_streak.pop(parent_lbl, None)
 
                 # If coordinator judged the previous execute turn as failed,
                 # record structured diagnosis and update per-task attempt history.

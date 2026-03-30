@@ -34,5 +34,3 @@ llm_settings = LLMSettings()
 ip_settings = IPSettings()
 
 
-KALI_IP = os.getenv("KALI_IP")
-TESTER_NAME = os.getenv("TESTER_NAME")

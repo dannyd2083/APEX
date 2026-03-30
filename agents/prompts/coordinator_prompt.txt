@@ -288,13 +288,17 @@ Step 2 — Classify into exactly one of three types and fill execute_diagnosis:
       ImportError / ModuleNotFoundError / command not found.
       The generated code has a bug, NOT an approach failure.
       Set "repair_mode": true. Max 2 repair attempts before treating as FUNDAMENTAL.
-  - FIXABLE: 404 / wrong URL / wrong parameter name / missing header — a specific concrete mistake
-      that can be corrected in one retry. Fix the specific thing, retry ONCE. If it fails again → FUNDAMENTAL.
-  - FUNDAMENTAL: anything else — the technique/approach cannot work due to a technical or logical
-      reason (wrong service, permission denied structurally, binary corruption, endpoint doesn't exist,
-      approach already confirmed ineffective). Output fail_tasks IMMEDIATELY.
-      If the task's ↳ attempts already show a previous FUNDAMENTAL for the same root cause,
-      you are in a loop — fail_tasks is mandatory, no exceptions.
+  - FIXABLE: The raw output contains direct evidence of the EXACT value to change — you are not
+      guessing, the output tells you what to fix. Examples: 404 but response reveals correct path,
+      error message names the missing parameter, wrong URL format shown in redirect.
+      Fix the specific thing, retry ONCE. If it fails again → FUNDAMENTAL.
+      KEY RULE: if you would be guessing what to change rather than reading it from output → NOT FIXABLE.
+  - FUNDAMENTAL: The approach itself is incompatible with the target — you cannot fix it by changing
+      a value. Examples: wrong service version, permission denied structurally (403/sudo required),
+      endpoint confirmed absent, binary corruption, payload stripped by filter, exploit requires
+      a feature the target doesn't have, approach already confirmed ineffective.
+      Also FUNDAMENTAL if task ↳ attempts already show the same root cause was tried before — you
+      are in a loop. Output fail_tasks IMMEDIATELY, no exceptions.
 Step 3 — NEVER theorize about what might be wrong before reading the actual error.
   NEVER rewrite a script based on reading its source code — run it, read the error, fix that error.
   If loop_warnings appears in the state snapshot, you are stuck. You MUST output fail_tasks.
