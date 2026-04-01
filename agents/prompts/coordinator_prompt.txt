@@ -116,7 +116,7 @@ You have two agents you can dispatch:
 
   HTTP SESSION TOOLS — share a persistent cookie jar on Kali (/tmp/plante_<host>.json).
   Use these for authenticated multi-step flows instead of writing Python scripts:
-    http_get    — fetch a URL; returns {status, url, text, csrf_token}
+    http_get    — fetch a URL; returns {status, url, text, csrf_token, hidden_fields}
     http_post   — POST form data; cookies auto-sent; returns {status, url, text}
     http_upload — multipart file upload; cookies auto-sent; returns {status, url, text}
   To use: set allowed_tools=["http_get"|"http_post"|"http_upload"] and include http_params.
@@ -142,15 +142,18 @@ USING HTTP SESSION TOOLS vs PYTHON SCRIPT:
 
 AUTHENTICATED LOGIN + UPLOAD FLOW (use HTTP session tools):
   Turn A: execute(bash) — create /tmp/shell.php.jpg on Kali, add hostname to /etc/hosts
-  Turn B: execute(http_get, login page) — read `text` for form fields + csrf_token -> set_key_facts
-  Turn C: execute(http_post, login) — submit credentials + _token from key_facts.csrf_token
-  Turn D: execute(http_get, settings/upload page) — get fresh csrf_token -> set_key_facts
-  Turn E: execute(http_upload) — upload with field name + _token from key_facts.csrf_token
+  Turn B: execute(http_get, login page) — read `hidden_fields` (ALL hidden inputs) + store via set_key_facts
+  Turn C: execute(http_post, login) — submit credentials + ALL key-value pairs from hidden_fields
+  Turn D: execute(http_get, settings/upload page) — get fresh hidden_fields -> set_key_facts
+  Turn E: execute(http_upload) — upload with field name + hidden_fields from key_facts
   Turn F: execute(http_get, webshell?cmd=id) — trigger and read output
 
 READING http_get RESPONSES: The `text` field is the full HTML. Read it for: form action URL,
-input field names, hidden fields (name="_method" value="PUT"), file paths, links.
-The "csrf_token" field is auto-extracted — store it immediately via set_key_facts.
+input field names, file paths, links.
+The "hidden_fields" dict contains ALL hidden form inputs (works for any framework — Laravel _token,
+Joomla MD5 hash, Django csrfmiddlewaretoken, etc.). Store the entire dict via set_key_facts immediately.
+When POSTing, include ALL hidden_fields key-value pairs in data alongside your credentials.
+The "csrf_token" field is also provided for convenience (Laravel _token value only).
 Store what you find so you don't lose it next turn.
 
 SET_KEY_FACTS — store immediately when you find any of these:
@@ -322,7 +325,7 @@ For recon or execute:
   "allowed_tools": ["<one tool: autorecon|zap-spider|zap-active|nmap|gobuster|sqlmap|nikto|curl|http_get|http_post|http_upload>"],
   "http_params": {
     "url": "<required for all HTTP tools>",
-    "data": {"<field>": "<value>", "_token": "<from key_facts.csrf_token>"},
+    "data": {"<field>": "<value>", "<hidden_field_name>": "<hidden_field_value>"},
     "field": "<upload field name — http_upload only>",
     "filepath": "<absolute path on Kali — http_upload only>",
     "mime": "<MIME type — http_upload only, default image/jpeg>"
@@ -342,8 +345,9 @@ For recon or execute:
 Notes:
 - http_params is REQUIRED when allowed_tools is http_get/http_post/http_upload; omit otherwise.
 - set_key_facts is optional; include ONLY when you have new values to store (don't repeat unchanged values).
-- csrf_token from an http_get response MUST be stored via set_key_facts immediately.
-- key_facts.csrf_token persists across turns — read it from the state snapshot's key_facts field.
+- hidden_fields from an http_get response MUST be stored via set_key_facts immediately.
+  Include ALL hidden_fields entries in your http_post data — do not pick just one.
+- csrf_token is also returned (Laravel _token value only) for convenience; hidden_fields is more general.
 
 For done (goal achieved or all paths exhausted):
 {
