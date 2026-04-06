@@ -16,20 +16,17 @@ def _id() -> str:
 @dataclass
 class Finding:
     id:          str
-    session_id:  int
     type:        str    # directory, service, credential, vulnerability, rce, auth, parameter
     value:       str
     confidence:  str    # low, medium, high
     evidence:    str    # what proves this
 
     is_verified: bool = False   # True = Execute Agent confirmed it
-    db_id:       Optional[int] = None
 
 
 @dataclass
 class Task:
     id:          str
-    session_id:  int
     description: str
     status:      str = 'pending'  # pending, in_progress, completed, failed
     label:       str = ""   # human-readable: "1", "1.2", "1.2.3"
@@ -48,13 +45,11 @@ class Task:
 
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
-    db_id:      Optional[int] = None
 
 
 
 @dataclass
 class PentestState:
-    session_id:  int
     target_url:  str
     target_name: str
     goal:        str   # shell, root, auth_bypass, data_exfil
@@ -81,14 +76,11 @@ class PentestState:
     goal_achieved: bool          = False
     goal_evidence: Optional[str] = None
 
-    db: object = field(default=None, repr=False, compare=False)
-
     def create_task(self, description: str, evidence_required: str = "",
                     parent_id: Optional[str] = None, max_attempts: int = 3,
                     task_type: str = "discover") -> Task:
         task = Task(
             id=f"task_{_id()}",
-            session_id=self.session_id,
             description=description,
             evidence_required=evidence_required,
             parent_id=parent_id,
@@ -102,10 +94,6 @@ class PentestState:
 
         if self.root_task_id is None:
             self.root_task_id = task.id
-
-        if self.db:
-            parent_db_id = self.tasks[parent_id].db_id if parent_id and parent_id in self.tasks else None
-            task.db_id = self.db.log_task(task, parent_db_id=parent_db_id)
 
         return task
 
@@ -122,20 +110,10 @@ class PentestState:
         if evidence is not None:
             task.evidence_found = evidence
 
-        if self.db and task.db_id:
-            self.db.update_task(
-                task_id=task.db_id,
-                status=status,
-                attempt_count=task.attempt_count,
-                evidence_found=(evidence.__dict__ if evidence else None),
-                updated_at=task.updated_at,
-            )
-
     def add_finding(self, type: str, value: str, confidence: str, evidence: str,
                     verified: bool = False) -> Finding:
         f = Finding(
             id=f"find_{_id()}",
-            session_id=self.session_id,
             type=type,
             value=value,
             confidence=confidence,
@@ -143,10 +121,6 @@ class PentestState:
             is_verified=verified,
         )
         self.findings.append(f)
-
-        if self.db:
-            f.db_id = self.db.log_finding(f)
-
         return f
 
     def record_action(self, entry: str) -> None:
@@ -172,10 +146,6 @@ class PentestState:
     def add_failed_approach(self, approach: str) -> None:
         if approach not in self.failed_approaches:
             self.failed_approaches.append(approach)
-            if self.db:
-                self.db.log_raw("state", "INFO",
-                                f"Dead end: {approach}",
-                                {"session_id": self.session_id})
 
     def task_tree_snapshot(self) -> str:
         """Render the labeled task tree for the coordinator LLM prompt."""
@@ -249,9 +219,6 @@ class PentestState:
         self.total_cost_usd += cost_usd
         self.total_turns += 1
 
-        if self.db:
-            self.db.update_run_budget(self.session_id, self.total_cost_usd, self.total_turns)
-
     def stop_reason(self) -> Optional[str]:
         if self.goal_achieved:
             return "goal_achieved"
@@ -268,9 +235,6 @@ class PentestState:
     def mark_goal_achieved(self, evidence: str) -> None:
         self.goal_achieved = True
         self.goal_evidence = evidence
-
-        if self.db:
-            self.db.update_run_final_evidence(self.session_id, evidence)
 
     def _prioritized_findings(self, n: int = 20) -> list:
         """

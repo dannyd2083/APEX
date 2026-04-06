@@ -335,7 +335,7 @@ For recon or execute:
   "rag_query": "<2-5 word exploit/escalate technique — e.g. 'file upload bypass', 'PHP webshell RCE', 'linux privesc SUID'. Leave EMPTY string for recon turns and authenticate phase — you already know how to test credentials and cookies>",
   "execute_success": "<true|false|null — YOUR judgment of the PREVIOUS execute turn; null if this turn is recon or turn 1>",
   "execute_evidence": "<one sentence: what in the output proves success or failure — null if not applicable>",
-  "execute_diagnosis": {"failure_type": "<FUNDAMENTAL|FIXABLE|SCRIPT_ERROR — required when execute_success=false>", "root_cause": "<WHY it fails mechanistically, not just what happened>", "evidence": "<specific line or error from raw output proving this>"},
+  "execute_diagnosis": {"failure_type": "<FUNDAMENTAL|FIXABLE|SCRIPT_ERROR — required when execute_success=false>", "root_cause": "<WHY it fails mechanistically, not just what happened>", "evidence": "<specific line or error from raw output proving this>", "target_service": "<FUNDAMENTAL only: technology name e.g. 'Joomla 4.x', 'Spring Boot 2.6', 'Apache 2.4' — omit for FIXABLE/SCRIPT_ERROR>", "lesson": "<FUNDAMENTAL only: one sentence generalizing this failure to a broader class — what principle applies to other targets with similar tech, not just this box — omit for FIXABLE/SCRIPT_ERROR>"},
   "repair_mode": "<true if retrying after SyntaxError/NameError/IndentationError — omit or false otherwise>",
   "complete_tasks": [{"label": "<label>", "note": "<what was found/achieved, under 80 chars>"}],
   "fail_tasks":     [{"label": "<label>", "note": "<why it failed, under 80 chars>"}],

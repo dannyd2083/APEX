@@ -11,6 +11,7 @@ from typing import Optional
 from agents.config.settings import llm_settings
 from agents.helpers.run_logger import RunLogger
 from agents.helpers.payloads_rag import PayloadsRAG
+from agents.helpers.error_rag import ErrorRAG
 from agents.llms.OpenRouter import OpenRouterLLM
 from agents.config.constants import WORKER_MODEL_NAME
 from agents.recon_agent import ReconAgent, ReconResult
@@ -43,7 +44,8 @@ class Coordinator:
         _worker      = worker_llm or llm
         self.recon   = ReconAgent(_worker)
         self.execute = ExecuteAgent(_worker)
-        self.vault   = PayloadsRAG()
+        self.vault      = PayloadsRAG()
+        self.error_rag  = ErrorRAG(state.target_name)
         self._prompt = _load_prompt()
         self.logger   = RunLogger(
             target_name=state.target_name,
@@ -52,6 +54,7 @@ class Coordinator:
             scope=state.scope,
         )
         self._rag_query = ""  # set by LLM after first recon; empty = skip RAG on Turn 1
+        self._error_rag_context = ""  # set on FUNDAMENTAL; injected into next turn's prompt
         self._exec_fail_streak: dict = {}   # current_task → consecutive execute_success=false count
         self._fundamental_streak: dict = {} # current_task → consecutive FUNDAMENTAL classifications
         self._child_fail_count: dict = {}   # parent_label → count of failed child tasks
@@ -145,6 +148,9 @@ class Coordinator:
                 if all_warnings:
                     snapshot_dict["loop_warnings"] = all_warnings
                 snapshot      = json.dumps(snapshot_dict, indent=2)
+                # Consume error RAG context written on previous FUNDAMENTAL classification
+                error_rag_context      = self._error_rag_context
+                self._error_rag_context = ""
                 prompt = (
                     self._prompt
                     .replace("__TARGET_URL__",     self.state.target_url)
@@ -154,6 +160,9 @@ class Coordinator:
                     .replace("__STATE_SNAPSHOT__", snapshot)
                     .replace("__LAST_RESULT__",    last_result)
                 )
+                if error_rag_context:
+                    prompt += f"\n\n{error_rag_context}"
+                    print(f"[ErrorRAG] Injected {len(error_rag_context)} chars into prompt")
     
                 # 3. Call LLM directly — coordinator does not use tools
                 response  = self.llm._call(prompt, phase="coordinator", json_mode=True)
@@ -334,8 +343,21 @@ class Coordinator:
                             self._fundamental_streak[current_label] = self._fundamental_streak.get(current_label, 0) + 1
                             fund_count = self._fundamental_streak[current_label]
                             print(f"[FundamentalTrack] Task '{current_label}' FUNDAMENTAL x{fund_count}")
+                            # Persist to error_paths DB + pre-fetch context for next turn
+                            task_obj = self.state.get_task_by_label(current_label)
+                            lesson = diag.get("lesson", "")
+                            target_service = diag.get("target_service", "")
+                            task_desc = task_obj.description if task_obj else current_label
+                            if root and lesson:
+                                self.error_rag.write_failure(
+                                    target_service=target_service,
+                                    target_os=self.state.target_os or "",
+                                    task=task_desc,
+                                    root_cause=root,
+                                    lesson=lesson,
+                                )
+                            self._error_rag_context = self.error_rag.query(task_desc, root)
                             if fund_count >= 2:
-                                task_obj = self.state.get_task_by_label(current_label)
                                 if task_obj and task_obj.status != "failed":
                                     note = (root or "FUNDAMENTAL — auto-failed after 2 classifications")[:120]
                                     self.state.set_task_note(current_label, note)
@@ -659,9 +681,6 @@ async def main():
     worker_llm = OpenRouterLLM(model_name=WORKER_MODEL_NAME)  # cheap — recon/execute
     print(f"[Coordinator] Models: coordinator={llm.model_name} | workers={worker_llm.model_name}")
 
-    db         = None
-    session_id = 1
-
     # Only enforce limits the user explicitly passed; leave the other at infinity
     _max_turns = args.max_turns if args.max_turns is not None else 999999
     _max_cost  = args.max_cost  if args.max_cost  is not None else 999999.0
@@ -669,24 +688,18 @@ async def main():
     _cost_limited  = args.max_cost  is not None
 
     state = PentestState(
-        session_id=session_id,
         target_url=args.target_url,
         target_name=args.target_name,
         goal=args.goal,
         scope=scope,
         max_turns=_max_turns,
         max_cost_usd=_max_cost,
-        db=db,
     )
     state._turns_limited = _turns_limited
     state._cost_limited  = _cost_limited
 
     coordinator = Coordinator(llm, state, worker_llm=worker_llm)
-    try:
-        await coordinator.run()
-    finally:
-        if db:
-            db.end_run(status="completed" if state.goal_achieved else "failed")
+    await coordinator.run()
 
 
 if __name__ == "__main__":
