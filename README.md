@@ -214,6 +214,4 @@ v2 (APEX) addresses this with a coordinator that reads output before each decisi
 | Medium (15)| 8/15 (53.3%) |
 | **Total**  | **30/42 (71.4%)** |
 
-The main failure categories were JavaScript-managed form fields (Joomla 4 CodeMirror — raw HTTP POST silently ignored without a browser), PHP execution restrictions (filter chain RCE, phar.readonly), and WebSocket blind SQLi (too slow for the turn budget).
-
-See `docs/capstone_report.pdf` for the full paper.
+The main failure categories were JavaScript-managed form fields (Joomla 4 CodeMirror), PHP execution restrictions (filter chain RCE, phar.readonly), and WebSocket blind SQLi (too slow for the turn budget).
