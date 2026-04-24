@@ -4,3 +4,4 @@ mcp
 python-dotenv
 requests
 psycopg2
+rank_bm25

@@ -35,6 +35,9 @@ nul
 # AnythingLLM storage
 anything-storage/
 
+# Ad-hoc test output dumps
+box_check.txt
+
 # LaTeX build files
 docs/*.aux
 docs/*.log
@@ -50,8 +53,9 @@ docs/*.blg
 *.log
 /tmp/
 
-# Results — local test output, not committed
+# Results and local docs — not committed
 results/
+docs/
 
 # Claude Code project memory
 .claude/
@@ -66,9 +70,9 @@ MCP-Kali-Server/
 *kali_key
 *kali_key.pub
 
-# Test files
-test.py
-test_*.py
+# Root-level ad-hoc test scripts (not tests/ directory)
+/test.py
+/test_*.py
 
 # Jupyter Notebooks checkpoints
 .ipynb_checkpoints/
