@@ -1,12 +1,16 @@
-# PLANTE — AI-Driven Automated Penetration Testing
+# APEX — Autonomous Penetration and EXploitation
 
-An AI-powered automated penetration testing framework that uses LLM agents to conduct autonomous reconnaissance and exploitation against intentionally vulnerable systems.
+An autonomous penetration testing agent that runs end-to-end against real HackTheBox machines. APEX combines a coordinator-driven multi-agent loop, a three-class failure taxonomy with code-enforced loop detection, and two complementary RAG systems to avoid repeating failed approaches.
 
-We inherited this project from the 2025 cohort and have been extending it — see the Capstone section at the bottom for what changed and where it's going.
+**Results**: 30/42 HackTheBox machines (71.4%) — 22/27 Easy (81.5%), 8/15 Medium (53.3%).
+
+This project was inherited from the 2025 cohort (original v1 codebase) and extended with a full v2 rewrite for the 2026 capstone.
+
+---
 
 ## Original Architecture (v1)
 
-The original system is a single orchestrator that plans everything upfront and executes blindly:
+The original system plans everything upfront and executes blindly — the LLM never sees HTTP responses during execution.
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -21,272 +25,195 @@ The original system is a single orchestrator that plans everything upfront and e
 │  │ OpenRouter│  │
 │  │   (LLM)   │  │
 │  └───────────┘  │
-│        │        │
-│        ▼        │
-│  ┌───────────┐  │
-│  │ Supabase  │  │
-│  │ (Logging) │  │
-│  └───────────┘  │
 └─────────────────┘
 ```
 
-Pipeline: `Recon → LLM plans all commands upfront → Execute → Classify failure → Remediate → Done`
+Pipeline: `Recon → LLM plans all commands upfront → Execute → Done`
 
-## New Architecture (v2, in progress)
+---
 
-We're replacing the orchestrator with three agents that work in a closed loop — the coordinator sees command output before deciding what to do next, rather than planning everything at once:
+## v2 Architecture (APEX)
+
+Three agents work in a closed loop. The coordinator reads command output before deciding what to do next, maintains a persistent task tree across turns, and applies failure classification to avoid retrying dead-end approaches.
 
 ```
-┌──────────────────────────────────────────┐
-│              Windows Host                │
-│                                          │
-│  ┌─────────────┐    ┌────────────────┐   │
-│  │ Coordinator │───▶│  Recon Agent   │   │
-│  │  (Brain)    │    │ nmap/gobuster  │   │
-│  │             │◀───│ /ZAP/curl      │   │
-│  │             │    └────────────────┘   │
-│  │             │                         │
-│  │             │    ┌────────────────┐   │
-│  │             │───▶│ Execute Agent  │   │
-│  │             │    │ curl/sqlmap    │   │
-│  │             │◀───│ /web tools     │   │
-│  └──────┬──────┘    └────────────────┘   │
-│         ▼                                │
-│  ┌─────────────┐   All agents use:       │
-│  │  Supabase   │   Kali Linux VM via     │
-│  │  (Logging)  │   MCP + SSH             │
-│  └─────────────┘                         │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│                Windows Host                  │
+│                                              │
+│  ┌─────────────────────────────────────────┐ │
+│  │             Coordinator                 │ │
+│  │  - Maintains task tree (PTT)            │ │
+│  │  - Classifies failures (3-class)        │ │
+│  │  - Queries PayloadsRAG + ErrorRAG       │ │
+│  └────────────┬──────────────┬─────────────┘ │
+│               │              │               │
+│        ┌──────▼──────┐ ┌─────▼──────┐        │
+│        │ Recon Agent │ │Execute Agent│        │
+│        │ nmap/gobust │ │ bash script │        │
+│        │ ZAP/sqlmap  │ │ HTTP tools  │        │
+│        └──────┬──────┘ └─────┬──────┘        │
+│               └──────┬───────┘               │
+│                      ▼                       │
+│               ┌─────────────┐                │
+│               │  Kali VM    │                │
+│               │ (via MCP)   │                │
+│               └─────────────┘                │
+└──────────────────────────────────────────────┘
 ```
 
-Focus is now on **black-box web pentesting** — the coordinator reads HTTP responses, adapts its approach, and tracks findings in a task tree (PTT). Before each LLM call the coordinator queries the redstack-vault knowledge base (4000+ real-world attack chains) and injects relevant patterns into the prompt. This is what was missing in v1.
+### Key Design Decisions
 
-## Document Source
-- [LangChain](https://docs.langchain.com/oss/python/langchain/overview)
-- [MCP-Kali-Server](https://github.com/Wh0am123/MCP-Kali-Server)
+**Failure taxonomy (3 classes)**
+- `SCRIPT_ERROR` — the generated script has a syntax/runtime error; trigger repair mode (max 2 retries)
+- `FIXABLE` — the output tells you exactly what to change; retry once with that fix
+- `FUNDAMENTAL` — the approach is incompatible with the target (wrong service version, payload stripped, endpoint absent); abandon the task
+
+**Code-enforced loop detection (3 counters)**
+- `_exec_fail_streak` — 2 consecutive execute failures → inject LOOP DETECTED warning
+- `_fundamental_streak` — 2 consecutive FUNDAMENTAL classifications → auto-fail the task (in code, not prompt)
+- `_child_fail_count` — 8 failed child tasks under same parent → auto-fail the parent
+
+**Two RAG systems**
+- `PayloadsRAG` — BM25 over PayloadsAllTheThings; queried every turn to inject relevant attack techniques
+- `Error Path RAG` — BM25 over past FUNDAMENTAL failures stored in Supabase; cross-run failure memory
+
+**One-turn lag judgment** — the execute agent never declares success; the coordinator evaluates the raw output one turn later with full task context, producing more accurate success/failure judgments.
+
+---
 
 ## Setup
 
-### 1. mcp-kali-server
+### 1. Kali VM
 
-MCP bridging Kali VM and Agents — [Github](https://github.com/Wh0am123/MCP-Kali-Server).
+1. Download Kali Linux from [kali.org](https://www.kali.org/get-kali/#kali-virtual-machines) and import into VirtualBox
+   - Adapter 1: Host-Only (for host ↔ VM comms)
+   - Adapter 2: NAT (for internet / HTB VPN)
 
-#### 1.1 Setting up on Kali VM
+2. Clone MCP-Kali-Server on the Kali VM:
+   ```bash
+   git clone https://github.com/Wh0am123/MCP-Kali-Server.git
+   cd MCP-Kali-Server && python3 -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-1. Download and import Kali VM from [official website](https://www.kali.org/get-kali/#kali-virtual-machines)
-    - Extract zip to desired location
-    - In VirtualBox, click **Add** to import VM
-    - Change network setting to **Host-Only Adapter** (for Adapter 1)
-    - Add **NAT** for Adapter 2 (for internet access)
-    - Open VM, username/password: kali
-2. In Kali VM, clone MCP Server
-    ```
-    git clone https://github.com/Wh0am123/MCP-Kali-Server.git
-    ```
-3. Start Server (**IMPORTANT: use --ip 0.0.0.0 to allow external connections**)
-    ```
-    python MCP-Kali-Server/kali_server.py --ip 0.0.0.0
-    ```
-4. For web recon, start OWASP ZAP in daemon mode:
-    ```
-    zaproxy -daemon -port 8080 -host 0.0.0.0
-    ```
+3. Start services on Kali before each run:
+   ```bash
+   # API server (must use --ip 0.0.0.0)
+   nohup python3 kali_api_server.py --ip 0.0.0.0 > /tmp/mcp.log 2>&1 &
 
-#### 1.2 Setting up on Host Machine
+   # HTB VPN
+   sudo openvpn --config ~/machines_us-dedivip-1.ovpn --daemon
 
-1. Clone the repo & install requirements
-    ```
-    git clone https://github.com/Wh0am123/MCP-Kali-Server.git
-    cd MCP-Kali-Server
-    python3 -m venv venv
+   # OWASP ZAP (for web recon)
+   nohup zaproxy -daemon -port 8080 -host 0.0.0.0 -config api.disablekey=true > /tmp/zap.log 2>&1 &
+   ```
 
-    # For Mac or Linux
-    source venv/bin/activate
+### 2. Windows Host
 
-    # For Windows
-    .\venv\Scripts\activate.bat
-
-    pip install requests fastmcp
-    ```
-
-2. Fix logging errors in `mcp_server.py` — change `sys.stdout` to `sys.stderr`:
-
-    ```python
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stderr)
-        ]
-    )
-    ```
-
-3. Start server
-    ```
-    python kali_server.py
-    ```
-
-### 2. Project Installation
-```
+```bash
+git clone https://github.com/dannyd2083/APEX.git
+cd APEX
+python -m venv venv
+.\venv\Scripts\activate        # Windows
+source venv/bin/activate       # Mac/Linux
 pip install -r requirements.txt
 ```
 
-**Additional packages needed:**
-```
-pip install langchain-mcp-adapters asyncssh paramiko scp pyyaml
-```
+### 3. Environment
 
-**Attack chain knowledge base (v2 only):**
-
-Place the `redstack-vault` repo as a sibling directory alongside PLANTE (same parent folder). `VaultRAG` in `agents/helpers/vault_rag.py` expects it at `../redstack-vault/`.
-
-### 3. Environment Configuration
-
-Copy `.env.example` to `.env` and fill in your values:
+Copy `.env.example` to `.env` and fill in:
 
 ```bash
-# VM IP Addresses (find yours with `ip addr` in each VM)
-KALI_IP=<your-kali-ip>
-
-# OpenRouter LLM
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-
-# Tester Name (for result files)
+KALI_IP=192.168.56.101         # your Kali host-only IP
+OPENROUTER_API_KEY=sk-or-v1-...
 TESTER_NAME=YourName
 
-# Supabase Database
-DB_HOST=your-project.supabase.co
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your-password
-DB_NAME=postgres
-DB_SSLMODE=require
+# Optional — only needed for Error Path RAG persistence
+DB_HOST=db.your-project.supabase.co
+DB_PASSWORD=...
 ```
 
-### 4. VirtualBox Network Setup
+### 4. VirtualBox Network
 
-Each setup may have different IP addresses depending on your VirtualBox configuration.
+File → Host Network Manager → create a Host-Only network with DHCP. Assign each VM Adapter 1 = Host-Only. Find IPs with `ip addr` inside each VM.
 
-1. Open VirtualBox > File > **Host Network Manager**
-2. Create or select a Host-Only Network
-3. Enable DHCP Server (or configure static IPs)
-4. For each VM, go to Settings > Network:
-   - **Adapter 1**: Host-Only Adapter (select your network)
-   - **Adapter 2** (Kali only): NAT (for internet access)
-5. Start VMs and find their IPs:
-   ```bash
-   ip addr
-   ```
-6. Update your `.env` file with the discovered IPs
-
-**Note**: Common ranges are `192.168.56.x` or `192.168.x.x` depending on your Host-Only network configuration.
-
-### 5. Database Migration (v2)
-
-Run `docs/migration_v2.sql` in the Supabase SQL editor. Adds the tables needed for the multi-agent system (tasks, findings, hypotheses, gate_decisions). Safe to run — no destructive changes to existing tables.
-
-## Repo Folders
-
-### agents/
-- `orchestrator.py` — original single-pipeline engine (v1, still works)
-- `coordinator.py` — multi-agent brain (v2, in progress)
-- `recon_agent.py` — recon worker (ZAP, gobuster, nmap, curl)
-- `execute_agent.py` — execute worker (curl, sqlmap, hydra, wfuzz)
-- `state.py` — shared state dataclasses for v2
-- `logger.py` — DB logging for both v1 and v2
-- `tools/` — SSH and MCP tool wrappers
-- `llms/` — OpenRouter client
-- `helpers/vault_rag.py` — RAG over redstack-vault attack chain library
-- `prompts/` — LLM prompt templates
-
-### docs/
-- `migration_v2.sql` — database migration for v2 tables
-- `run_log.md` — notes from all test runs
-- `presentation_outline.md` — slides outline
-
-### results/
-Output JSON files from test runs (gitignored, local only).
+---
 
 ## Running
 
-### v1 (original pipeline, still works)
-
 ```bash
-# Activate venv
-.\venv\Scripts\activate    # Windows
-source .venv/bin/activate  # Mac/Linux
-
-python -m agents.orchestrator --target-ip <IP> --target-os <OS> --target-name <Name> --fresh-scan
+.\venv\Scripts\activate   # Windows
+python -m agents.coordinator --target-ip <IP> --target-os <OS> --target-name <Name>
 ```
 
-### v2 (multi-agent, in progress)
+Results are saved to `results/v2/<Name>_<timestamp>/run.md` and `run.json`.
 
-Not ready yet — coordinator.py is being built.
+**Cost**: ~$0.40–1.00 per easy box, ~$2–3 per medium box (Claude Opus 4.6 coordinator + Sonnet 4.6 workers via OpenRouter).
+
+---
+
+## Repo Structure
+
+```
+agents/
+├── coordinator.py          # Main loop: task tree, failure classification, RAG
+├── recon_agent.py          # Recon: nmap, gobuster, ZAP, sqlmap, curl
+├── execute_agent.py        # Exploitation: bash scripts, HTTP session tools
+├── state.py                # PentestState: task tree, findings, key_facts
+├── config/                 # settings.py, constants.py (models, limits)
+├── helpers/
+│   ├── payloads_rag.py     # BM25 RAG over PayloadsAllTheThings
+│   ├── error_rag.py        # BM25 RAG over past FUNDAMENTAL failures
+│   ├── run_logger.py       # Writes results/v2/ logs
+│   ├── token_tracker.py    # Per-call cost tracking
+│   └── output_parsers.py   # Deterministic parsers for nmap/gobuster/ZAP output
+├── llms/
+│   └── OpenRouter.py       # OpenRouter API client
+├── prompts/                # LLM prompt templates
+└── tools/
+    └── KaliMCP.py          # MCP client → kali_bridge.py → Kali REST API
+
+mcp/
+└── kali_bridge.py          # FastMCP bridge (Windows side)
+
+tests/
+└── test_error_rag.py       # Unit tests for Error Path RAG (no DB needed)
+
+config_files/               # MCP config templates for Claude Desktop / 5ire
+results/                    # Local run output (gitignored)
+```
+
+---
 
 ## Troubleshooting
 
-### Kali Server Not Accessible from Host
-
-**Symptom**: `curl http://<kali-ip>:5000/health` fails from host machine
-
-**Solution**: Start server with `--ip 0.0.0.0`:
+**Kali API not reachable from host**
 ```bash
-python3 kali_server.py --ip 0.0.0.0
+# Must start with --ip 0.0.0.0, not default 127.0.0.1
+python3 kali_api_server.py --ip 0.0.0.0
 ```
 
-### Port 5000 Already in Use on Kali
+**Port 5000 occupied on Kali**
 ```bash
 sudo kill -9 $(sudo lsof -t -i :5000)
 ```
 
-### SSH Permission Denied
+**OpenRouter 402 error** — add credits at openrouter.ai/settings/credits
 
-**Symptom**: SSH fails despite correct password
-
-**Solution**:
-1. Verify correct IP (`ip addr` in VM console)
-2. Check `/etc/ssh/sshd_config`:
-   ```
-   PasswordAuthentication yes
-   KbdInteractiveAuthentication yes
-   ```
-3. Restart SSH: `sudo systemctl restart sshd`
-
-### OpenRouter 402 Error
-
-**Symptom**: `Error code: 402 - insufficient credits`
-
-**Solution**:
-1. Add credits at https://openrouter.ai/settings/credits
-2. Or reduce `max_tokens` in `agents/llms/OpenRouter.py`
-
-### Windows Filename Error
-
-**Symptom**: `OSError: [Errno 22] Invalid argument` when saving results
-
-**Solution**: Fixed in `agents/helpers/save_json.py` — colons replaced with dashes in timestamps
-
-## Cost Estimates
-
-- **OpenRouter (Grok-4)**: ~$0.20–0.50 per run (1 round), ~$1.00–1.40 (3 rounds)
-- **Supabase**: Free tier is enough for testing
-- **OWASP ZAP**: Free, runs on Kali
+---
 
 ## Capstone 2026
 
-We tested the v1 system on 7 HackTheBox machines:
+We tested v1 on 7 HTB machines and found the core limitation: the LLM plans commands upfront with no feedback loop, so it cannot adapt when a service responds unexpectedly. Web app boxes all failed; network CVE boxes worked.
 
-| Box | OS | Result |
-|-----|----|--------|
-| Lame | Linux | Samba exploit worked |
-| Blue | Windows | EternalBlue worked |
-| Legacy | Windows | MS08-067 worked |
-| Optimum | Windows | Got user shell, not SYSTEM |
-| Bashed | Linux | Failed — found web shell but sent wrong POST param |
-| Jerry | Windows | Failed — tried `tomcat:tomcat`, real password was in the 401 page |
-| Nibbles | Linux | Failed — found the path but too late |
+v2 (APEX) addresses this with a coordinator that reads output before each decision. On 42 HTB machines:
 
-Network exploits went 4/4. Web app boxes went 0/3. The problem in all three failures was the same: the LLM couldn't see HTTP responses during execution, so it couldn't adapt when something was slightly off.
+| Difficulty | Success |
+|------------|---------|
+| Easy (27)  | 22/27 (81.5%) |
+| Medium (15)| 8/15 (53.3%) |
+| **Total**  | **30/42 (71.4%)** |
 
-That's what v2 is trying to fix — building a coordinator that reads output and decides what to do next, rather than planning everything before running a single command.
+The main failure categories were JavaScript-managed form fields (Joomla 4 CodeMirror — raw HTTP POST silently ignored without a browser), PHP execution restrictions (filter chain RCE, phar.readonly), and WebSocket blind SQLi (too slow for the turn budget).
+
+See `docs/capstone_report.pdf` for the full paper.
