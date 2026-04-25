@@ -77,7 +77,6 @@ class ReconAgent:
         primary_tool = (allowed_tools or ["curl"])[0].lower()
 
         if primary_tool in _NAMED_TOOLS:
-            # ── Named MCP tool path — no bash script generation ────────────
             print(f"[ReconAgent] Using named MCP tool: {primary_tool}")
             try:
                 raw_output = await self._run_named_tool(primary_tool, target_url)
@@ -85,7 +84,6 @@ class ReconAgent:
                 return ReconResult(error=f"Named tool '{primary_tool}' failed: {e}")
             script = f"# {primary_tool} via named MCP tool"
         else:
-            # ── Bash script fallback (curl, nikto, complex tasks) ──────────
             script, raw_output = await self._run_bash_script(
                 target_url, objective, allowed_tools, context
             )
@@ -113,10 +111,6 @@ class ReconAgent:
         result.script     = script
         result.raw_output = raw_output
         return result
-
-    # ------------------------------------------------------------------
-    # Named tool dispatch
-    # ------------------------------------------------------------------
 
     async def _run_named_tool(self, tool: str, target_url: str) -> str:
         if tool == "nmap":
@@ -149,10 +143,6 @@ class ReconAgent:
                 await asyncio.sleep(5)
             return raw  # return last attempt regardless
         return f"(unknown named tool: {tool})"
-
-    # ------------------------------------------------------------------
-    # Bash script fallback
-    # ------------------------------------------------------------------
 
     async def _resolve_vhost(self, url: str) -> str:
         """If url uses a bare IP, check Kali /etc/hosts for a hostname and return hostname URL."""

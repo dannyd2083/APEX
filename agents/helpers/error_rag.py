@@ -38,25 +38,12 @@ def _get_conn():
 
 
 class ErrorRAG:
-    """
-    Persistent failure database for FUNDAMENTAL task failures.
-
-    Writes FUNDAMENTAL failure records to Supabase (error_paths table).
-    Queries with BM25 — same approach as PayloadsRAG, but over our own run history.
-
-    Gracefully degrades (prints warning, skips) when DB env vars are not configured.
-    """
-
     def __init__(self, box_name: str):
         self.box_name = box_name
         self._written: set = set()   # (box_name, task) pairs written this run — dedup guard
         self._corpus:   Optional[list] = None
         self._metadata: Optional[list] = None
         self._bm25:     Optional[BM25Okapi] = None
-
-    # ------------------------------------------------------------------
-    # Write
-    # ------------------------------------------------------------------
 
     def write_failure(
         self,
@@ -113,10 +100,6 @@ class ErrorRAG:
             print(f"[ErrorRAG] Write failed: {e}")
         finally:
             conn.close()
-
-    # ------------------------------------------------------------------
-    # Query
-    # ------------------------------------------------------------------
 
     def _build_index(self) -> bool:
         """Load all records from DB and build BM25 index. Returns False on failure."""

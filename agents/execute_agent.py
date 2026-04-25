@@ -72,7 +72,6 @@ class ExecuteAgent:
         tools_str   = ", ".join(allowed_tools) if allowed_tools else "curl, sqlmap, hydra, wfuzz, python3"
         context_str = f"Context from coordinator:\n{context}" if context else ""
 
-        # ── Call 1: ask LLM to write the bash script ──────────────────────
         script_prompt = (
             _load("execute_script_prompt.txt")
             .replace("__TARGET_URL__",    target_url)
@@ -147,7 +146,6 @@ class ExecuteAgent:
         except Exception:
             pass  # cleanup failure is non-fatal
 
-        # ── Execute on Kali — with self-healing retry ──────────────────────
         MAX_FIX_ATTEMPTS = 2
         raw_output = ""
         for attempt in range(MAX_FIX_ATTEMPTS + 1):
@@ -182,7 +180,6 @@ class ExecuteAgent:
 
         print(f"[ExecuteAgent] Output: {raw_output[:300]}")
 
-        # ── Call 2: interpret the output ───────────────────────────────────
         interpret_prompt = (
             _load("execute_interpret_prompt.txt")
             .replace("__TASK__",   task)
