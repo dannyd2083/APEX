@@ -74,7 +74,7 @@ Three agents work in a closed loop. The coordinator reads command output before 
 - `_child_fail_count` — 8 failed child tasks under same parent → auto-fail the parent
 
 **Two RAG systems**
-- `PayloadsRAG` — BM25 over PayloadsAllTheThings; queried every turn to inject relevant attack techniques
+- `PayloadsRAG` — BM25 over [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings); queried every turn to inject relevant attack techniques
 - `Error Path RAG` — BM25 over past FUNDAMENTAL failures stored in Supabase; cross-run failure memory
 
 **One-turn lag judgment** — the execute agent never declares success; the coordinator evaluates the raw output one turn later with full task context, producing more accurate success/failure judgments.
@@ -89,11 +89,12 @@ Three agents work in a closed loop. The coordinator reads command output before 
    - Adapter 1: Host-Only (for host ↔ VM comms)
    - Adapter 2: NAT (for internet / HTB VPN)
 
-2. Clone MCP-Kali-Server on the Kali VM:
+2. Copy the Kali server to the VM and install deps:
    ```bash
-   git clone https://github.com/Wh0am123/MCP-Kali-Server.git
-   cd MCP-Kali-Server && python3 -m venv venv && source venv/bin/activate
-   pip install -r requirements.txt
+   # On Kali VM — copy kali/ from this repo (or git clone APEX and use kali/ directory)
+   cd /home/kali/MCP-Kali-Server
+   python3 -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt   # flask, requests
    ```
 
 3. Start services on Kali before each run:
@@ -180,6 +181,9 @@ tests/
 └── test_error_rag.py       # Unit tests for Error Path RAG (no DB needed)
 
 config_files/               # MCP config templates for Claude Desktop / 5ire
+kali/                       # ⚠️ Deploy on Kali VM, not the Windows host
+├── kali_api_server.py      # Flask REST API server (run this on Kali)
+└── requirements.txt        # Kali-side deps: pip install -r requirements.txt
 results/                    # Local run output (gitignored)
 ```
 
