@@ -28,31 +28,12 @@ DEFAULT_KALI_SERVER = "http://localhost:5000" # change to your linux IP
 DEFAULT_REQUEST_TIMEOUT = 3660  # 61 minutes — 60s buffer over server's 3600s COMMAND_TIMEOUT
 
 class KaliToolsClient:
-    """Client for communicating with the Kali Linux Tools API Server"""
-    
     def __init__(self, server_url: str, timeout: int = DEFAULT_REQUEST_TIMEOUT):
-        """
-        Initialize the Kali Tools Client
-        
-        Args:
-            server_url: URL of the Kali Tools API Server
-            timeout: Request timeout in seconds
-        """
         self.server_url = server_url.rstrip("/")
         self.timeout = timeout
         logger.info(f"Initialized Kali Tools Client connecting to {server_url}")
         
     def safe_get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Perform a GET request with optional query parameters.
-        
-        Args:
-            endpoint: API endpoint path (without leading slash)
-            params: Optional query parameters
-            
-        Returns:
-            Response data as dictionary
-        """
         if params is None:
             params = {}
 
@@ -71,16 +52,6 @@ class KaliToolsClient:
             return {"error": f"Unexpected error: {str(e)}", "success": False}
 
     def safe_post(self, endpoint: str, json_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Perform a POST request with JSON data.
-        
-        Args:
-            endpoint: API endpoint path (without leading slash)
-            json_data: JSON data to send
-            
-        Returns:
-            Response data as dictionary
-        """
         url = f"{self.server_url}/{endpoint}"
         
         try:
@@ -96,36 +67,12 @@ class KaliToolsClient:
             return {"error": f"Unexpected error: {str(e)}", "success": False}
 
     def execute_command(self, command: str) -> Dict[str, Any]:
-        """
-        Execute a generic command on the Kali server
-        
-        Args:
-            command: Command to execute
-            
-        Returns:
-            Command execution results
-        """
         return self.safe_post("api/command", {"command": command})
     
     def check_health(self) -> Dict[str, Any]:
-        """
-        Check the health of the Kali Tools API Server
-        
-        Returns:
-            Health status information
-        """
         return self.safe_get("health")
 
 def setup_mcp_server(kali_client: KaliToolsClient) -> FastMCP:
-    """
-    Set up the MCP server with all tool functions
-    
-    Args:
-        kali_client: Initialized KaliToolsClient
-        
-    Returns:
-        Configured FastMCP instance
-    """
     mcp = FastMCP("kali-mcp")
     
     @mcp.tool()
@@ -468,10 +415,6 @@ def main():
     """Main entry point for the MCP server."""
     args = parse_args()
 
-    # # Check if running in stdio mode
-    # is_stdio = sys.stdin.isatty() is False and sys.stdout.isatty() is False
-    
-    # Configure logging based on debug flag
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")

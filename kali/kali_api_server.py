@@ -115,8 +115,6 @@ COMMAND_TIMEOUT = 3600  # 60 minutes default timeout
 app = Flask(__name__)
 
 class CommandExecutor:
-    """Class to handle command execution with better timeout management"""
-    
     def __init__(self, command: str, timeout: int = COMMAND_TIMEOUT):
         self.command = command
         self.timeout = timeout
@@ -129,17 +127,14 @@ class CommandExecutor:
         self.timed_out = False
     
     def _read_stdout(self):
-        """Thread function to continuously read stdout"""
         for line in iter(self.process.stdout.readline, ''):
             self.stdout_data += line
     
     def _read_stderr(self):
-        """Thread function to continuously read stderr"""
         for line in iter(self.process.stderr.readline, ''):
             self.stderr_data += line
     
     def execute(self) -> Dict[str, Any]:
-        """Execute the command and handle timeout gracefully"""
         logger.info(f"Executing command: {self.command}")
         
         try:
@@ -228,15 +223,6 @@ class CommandExecutor:
 
 
 def execute_command(command: str) -> Dict[str, Any]:
-    """
-    Execute a shell command and return the result
-    
-    Args:
-        command: The command to execute
-        
-    Returns:
-        A dictionary containing the stdout, stderr, and return code
-    """
     executor = CommandExecutor(command)
     return executor.execute()
 
@@ -639,17 +625,6 @@ def health_check():
         "tools_status": tools_status,
         "all_essential_tools_available": all_essential_tools_available
     })
-
-@app.route("/mcp/capabilities", methods=["GET"])
-def get_capabilities():
-    # Return tool capabilities similar to our existing MCP server
-    pass
-
-@app.route("/mcp/tools/kali_tools/<tool_name>", methods=["POST"])
-def execute_tool(tool_name):
-    # Direct tool execution without going through the API server
-    pass
-
 
 @app.route("/api/http/get", methods=["POST"])
 def http_get_route():

@@ -59,10 +59,6 @@ class Coordinator:
         self._fundamental_streak: dict = {} # current_task → consecutive FUNDAMENTAL classifications
         self._child_fail_count: dict = {}   # parent_label → count of failed child tasks
 
-    # ------------------------------------------------------------------
-    # Main loop
-    # ------------------------------------------------------------------
-
     async def run(self) -> PentestState:
         # Build the initial labeled task tree
         self.state.create_labeled_task(None,
@@ -520,10 +516,6 @@ class Coordinator:
 
         return self.state
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     def _parse_action(self, text: str) -> Optional[dict]:
         # Strip markdown code fences if LLM wrapped the JSON
         stripped = re.sub(r"^```(?:json)?\s*\n?", "", text.strip(), flags=re.IGNORECASE)
@@ -560,10 +552,6 @@ class Coordinator:
             for lesson in self.state.script_lessons:
                 lines.append(f"  - {lesson}")
         return "\n".join(lines)
-
-    # ------------------------------------------------------------------
-    # Ingest agent results into state
-    # ------------------------------------------------------------------
 
     async def _verify_path(self, path: str) -> bool:
         """Returns False if path returns the same page as homepage (catch-all false positive)."""
@@ -635,10 +623,6 @@ class Coordinator:
         # Do NOT auto-add output_summary here — it pollutes failed_approaches with successful steps.
         pass
 
-    # ------------------------------------------------------------------
-    # Format results for __LAST_RESULT__ in next prompt
-    # ------------------------------------------------------------------
-
     def _format_recon(self, result: ReconResult) -> str:
         lines = ["[Recon Agent Result]", f"Summary: {result.raw_summary}"]
         for f in result.findings:
@@ -658,10 +642,6 @@ class Coordinator:
             lines.append(_fmt_raw(result.raw_output))
         return "\n".join(lines)
 
-
-# ------------------------------------------------------------------
-# Entry point
-# ------------------------------------------------------------------
 
 async def main():
     parser = argparse.ArgumentParser(description="PLANTE v2 Coordinator")
